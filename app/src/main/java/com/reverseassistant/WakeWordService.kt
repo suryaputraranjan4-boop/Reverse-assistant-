@@ -124,7 +124,7 @@ class WakeWordService : Service() {
     }
 
     private fun startVosk(modelPath: String) {
-        LibVosk.setLogLevel(LogLevel.WARN)
+        LibVosk.setLogLevel(LogLevel.WARNINGS)
         val model = Model(modelPath)
         val recognizer = Recognizer(model, 16000.0f)
         val speech = VoskSpeechService(recognizer, 16000.0f)
