@@ -23,16 +23,19 @@ class AiClient {
         model: String,
         apiKey: String,
         prompt: String,
-        image: ByteArray? = null
+        image: ByteArray? = null,
+        customEndpoint: String? = null
     ): String = withContext(Dispatchers.IO) {
         require(apiKey.isNotBlank()) { "Add an API key for ${provider.label} in Settings." }
         require(prompt.isNotBlank()) { "Write a message first." }
         val image64 = image?.let { Base64.encodeToString(it, Base64.NO_WRAP) }
         val request = when (provider) {
             AiProvider.GEMINI -> gemini(model, apiKey, prompt, image64)
-            AiProvider.OPENAI -> openAi("https://api.openai.com/v1/chat/completions", model, apiKey, prompt, image64, false)
-            AiProvider.OPENROUTER -> openAi("https://openrouter.ai/api/v1/chat/completions", model, apiKey, prompt, image64, true)
             AiProvider.CLAUDE -> claude(model, apiKey, prompt, image64)
+            else -> openAi(
+                if (provider == AiProvider.CUSTOM_OPENAI_COMPATIBLE) validateCustomEndpoint(customEndpoint) else provider.endpoint!!,
+                model, apiKey, prompt, image64, provider == AiProvider.OPENROUTER
+            )
         }
         http.newCall(request).execute().use { response ->
             val body = response.body?.string().orEmpty()
@@ -47,8 +50,7 @@ class AiClient {
                         (0 until parts.length()).mapNotNull { parts.optJSONObject(it)?.optString("text") }
                             .joinToString("\n").trim()
                     }.orEmpty()
-                AiProvider.OPENAI, AiProvider.OPENROUTER ->
-                    json.optJSONArray("choices")?.optJSONObject(0)?.optJSONObject("message")?.optString("content").orEmpty()
+                else -> json.optJSONArray("choices")?.optJSONObject(0)?.optJSONObject("message")?.optString("content").orEmpty()
                 AiProvider.CLAUDE -> json.optJSONArray("content")?.let { blocks ->
                     (0 until blocks.length()).mapNotNull { blocks.optJSONObject(it)?.takeIf { b -> b.optString("type") == "text" }?.optString("text") }
                         .joinToString("\n").trim()
@@ -65,6 +67,7 @@ class AiClient {
         apiKey: String,
         prompt: String,
         image: ByteArray? = null,
+        customEndpoint: String? = null,
         onDelta: (String) -> Unit
     ): String = withContext(Dispatchers.IO) {
         require(apiKey.isNotBlank()) { "Add an API key for ${provider.label} in Settings." }
@@ -72,9 +75,11 @@ class AiClient {
         val image64 = image?.let { Base64.encodeToString(it, Base64.NO_WRAP) }
         val request = when (provider) {
             AiProvider.GEMINI -> gemini(model, apiKey, prompt, image64, true)
-            AiProvider.OPENAI -> openAi("https://api.openai.com/v1/chat/completions", model, apiKey, prompt, image64, false, true)
-            AiProvider.OPENROUTER -> openAi("https://openrouter.ai/api/v1/chat/completions", model, apiKey, prompt, image64, true, true)
             AiProvider.CLAUDE -> claude(model, apiKey, prompt, image64, true)
+            else -> openAi(
+                if (provider == AiProvider.CUSTOM_OPENAI_COMPATIBLE) validateCustomEndpoint(customEndpoint) else provider.endpoint!!,
+                model, apiKey, prompt, image64, provider == AiProvider.OPENROUTER, true
+            )
         }
         val result = StringBuilder()
         http.newCall(request).execute().use { response ->
@@ -97,7 +102,7 @@ class AiClient {
                                 (0 until parts.length()).mapNotNull { parts.optJSONObject(it)?.optString("text") }
                                     .joinToString("")
                             }.orEmpty()
-                        AiProvider.OPENAI, AiProvider.OPENROUTER -> {
+                        else -> {
                             val content = event.optJSONArray("choices")?.optJSONObject(0)
                                 ?.optJSONObject("delta")?.opt("content")
                             when (content) {
@@ -118,6 +123,14 @@ class AiClient {
             }
         }
         result.toString().ifBlank { "The provider returned an empty response." }
+    }
+
+    private fun validateCustomEndpoint(value: String?): String {
+        val endpoint = value?.trim().orEmpty()
+        require(endpoint.startsWith("https://", ignoreCase = true) && endpoint.length <= 500) {
+            "Custom provider endpoint must be a valid HTTPS URL."
+        }
+        return endpoint
     }
 
     private fun gemini(model: String, key: String, prompt: String, image64: String?, streaming: Boolean = false): Request {
