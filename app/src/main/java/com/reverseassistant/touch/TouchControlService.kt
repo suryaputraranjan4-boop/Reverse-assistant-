@@ -42,6 +42,25 @@ class TouchControlService : AccessibilityService() {
         }
     }
 
+    /** Launches an app only when one unique launcher label matches the user's confirmed request. */
+    fun launchApp(label: String): Boolean {
+        val target = label.trim()
+        if (target.isBlank()) return false
+        val launcher = android.content.Intent(android.content.Intent.ACTION_MAIN)
+            .addCategory(android.content.Intent.CATEGORY_LAUNCHER)
+        val matches = packageManager.queryIntentActivities(launcher, 0).mapNotNull { info ->
+            val appLabel = info.loadLabel(packageManager)?.toString()?.trim().orEmpty()
+            if (appLabel.isBlank()) null else info.activityInfo.packageName to appLabel
+        }.distinctBy { it.first }
+        val exact = matches.filter { it.second.equals(target, ignoreCase = true) }
+        val candidates = if (exact.isNotEmpty()) exact else
+            matches.filter { it.second.contains(target, ignoreCase = true) }
+        if (candidates.size != 1) return false
+        val launchIntent = packageManager.getLaunchIntentForPackage(candidates.single().first) ?: return false
+        launchIntent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        return try { startActivity(launchIntent); true } catch (_: Exception) { false }
+    }
+
     fun tapText(target: String): Boolean {
         val root = rootInActiveWindow ?: return false
         return clickMatchingNode(root, target.trim().lowercase())
