@@ -37,3 +37,11 @@ No accessibility permission is enabled automatically. The user grants it in Andr
 ## Avatar renderer
 
 The app now includes an original procedural OpenGL ES 2.0 companion built from generated sphere meshes. It has subtle idle rotation, periodic blinking, and a mouth animation driven by Android TextToSpeech utterance callbacks. It does not load the uploaded PMX/MMD archive; that format needs a dedicated importer/conversion pipeline and each included character asset must be cleared for use first.
+
+
+## Document import
+
+- TXT/Markdown/CSV/JSON import is capped at 1.5 MB raw input.
+- PDF text extraction uses PDFBox-Android, caps files at 20 MB and extraction at 30 pages / 120,000 characters. Image-only/scanned pages are not OCR'd.
+- DOCX extraction reads the main WordprocessingML document text; embedded objects, comments, tracked changes, and complex layout are not preserved.
+- Parsing runs on an IO dispatcher. The selected document text is included only in the next message sent by the user.
