@@ -17,6 +17,49 @@ class TouchControlService : AccessibilityService() {
     override fun onInterrupt() = Unit
     override fun onDestroy() { active = null; super.onDestroy() }
 
+    fun screenContext(maxItems: Int = 45): String {
+        val root = rootInActiveWindow ?: return "No accessible screen is currently available."
+        val lines = mutableListOf<String>()
+        collectText(root, lines, maxItems.coerceIn(1, 80))
+        return lines.joinToString("\\n").ifBlank { "The current screen exposes no readable text." }
+    }
+
+    private fun collectText(node: android.view.accessibility.AccessibilityNodeInfo?, out: MutableList<String>, limit: Int) {
+        if (node == null || out.size >= limit) return
+        val label = listOf(node.text?.toString(), node.contentDescription?.toString())
+            .filterNotNull().map { it.trim() }.filter { it.isNotBlank() }.distinct().joinToString(" | ")
+        if (label.isNotBlank()) {
+            val traits = buildList {
+                if (node.isClickable) add("clickable")
+                if (node.isScrollable) add("scrollable")
+                if (node.isEditable) add("editable")
+            }
+            out.add(if (traits.isEmpty()) label else "$label [${traits.joinToString()}]")
+        }
+        for (i in 0 until node.childCount) {
+            if (out.size >= limit) break
+            collectText(node.getChild(i), out, limit)
+        }
+    }
+
+    fun tapText(target: String): Boolean {
+        val root = rootInActiveWindow ?: return false
+        return clickMatchingNode(root, target.trim().lowercase())
+    }
+
+    private fun clickMatchingNode(node: android.view.accessibility.AccessibilityNodeInfo?, target: String): Boolean {
+        if (node == null || target.isBlank()) return false
+        val labels = listOf(node.text?.toString(), node.contentDescription?.toString())
+            .filterNotNull().map { it.trim().lowercase() }
+        if (labels.any { it == target || it.contains(target) } && node.isClickable) {
+            return node.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK)
+        }
+        for (i in 0 until node.childCount) {
+            if (clickMatchingNode(node.getChild(i), target)) return true
+        }
+        return false
+    }
+
     fun tap(x: Float, y: Float): Boolean = dispatch(points = listOf(Stroke(x,y,0,70)))
     fun longPress(x: Float, y: Float, holdMs: Long = 700): Boolean =
         dispatch(points = listOf(Stroke(x,y,0,holdMs.coerceIn(500,3000))))
