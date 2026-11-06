@@ -197,7 +197,8 @@ class MainActivity : ComponentActivity() {
                                         The user explicitly requested phone control. If one safe, clear action is
                                         appropriate, return exactly one JSON object and no other text:
                                         {"phone_action":{"type":"tap_text","target":"visible label"}}
-                                        Allowed types: tap_text, tap, double_tap, long_press, repeat_tap, swipe, scroll_up, scroll_down.
+                                        Allowed types: launch_app, tap_text, tap, double_tap, long_press, repeat_tap, swipe, scroll_up, scroll_down.
+                                        For launch_app, target must be the exact visible app name.
                                         Coordinate fields x,y,x2,y2 must be normalized from 0.0 to 1.0.
                                         For repeat_tap use count 1..10. For long_press/swipe use duration_ms.
                                         Do not guess targets or perform sensitive actions. If uncertain, ask a question
