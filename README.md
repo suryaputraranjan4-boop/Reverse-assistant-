@@ -10,7 +10,7 @@ Android-first personal AI companion built with Kotlin, Jetpack Compose, Material
 - Local chat history (latest 120 messages), clear-chat, transcript export, and backup/restore. API keys and Android permissions are excluded from backups.
 - Original procedural OpenGL ES 2.0 companion with idle movement, blinking, and TextToSpeech-synchronized mouth animation.
 - Camera capture, one-shot screenshot, foreground microphone dictation, wake-phrase listener, and user-consented screen sampling.
-- User-selected TXT, Markdown, CSV, JSON, PDF, and DOCX import. PDF text extraction is limited to 20 MB, 30 pages, and 120,000 characters; scanned/image-only PDFs are not OCR'd.
+- User-selected TXT, Markdown, CSV, JSON, PDF, and DOCX import. PDF text extraction is limited to 20 MB, 30 pages, and 120,000 characters; scanned/image-only PDFs fall back to on-device ML Kit OCR for Latin and Devanagari scripts.
 - Ranked DuckDuckGo HTML web search with titles, snippets, and source URLs. Search depends on network access and may be rate-limited.
 - Obsidian vault integration through Android's Storage Access Framework; notes are saved only after user action.
 - Optional Android AccessibilityService for allow-listed phone gestures and app launching. AI-proposed plans are limited to five actions and require individual confirmation.
@@ -25,7 +25,7 @@ The following are **not complete**:
 - A dedicated offline wake-word engine. Wake phrases use Android's speech recognition service and may depend on its configured provider/network.
 - External MCP/plugin-server connections. The plugin registry currently toggles built-in app capabilities only.
 - Offline LLM runtime and model management.
-- OCR for scanned PDFs.
+- OCR scripts beyond Latin and Devanagari, handwriting recognition, and exact document layout reconstruction.
 - Full provider compatibility testing and physical-device validation.
 
 A successful GitHub Actions build verifies compilation, unit tests, and APK packaging only. It does not prove runtime behavior on a physical device or validate provider API credentials. Provider calls require the user's own API keys and may incur charges.
