@@ -265,7 +265,7 @@ class MainActivity : ComponentActivity() {
                             image = null
                             scope.launch {
                                 try {
-                                    val savedMemory = ObsidianVault.readMemory(this@MainActivity)
+                                    val savedMemory = ObsidianVault.readRelevantMemory(this@MainActivity, text)
                                     val recentChat = messages.dropLast(1).takeLast(12).joinToString("\n") {
                                         (if (it.fromUser) "User: " else "Assistant: ") + it.text
                                     }
