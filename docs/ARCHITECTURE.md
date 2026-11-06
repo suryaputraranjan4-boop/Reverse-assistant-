@@ -23,3 +23,12 @@
 ## Safety and consent
 
 No accessibility permission is enabled automatically. The user grants it in Android Settings and can revoke it at any time. Camera and voice actions are initiated by visible buttons. Obsidian writes happen only after the user presses Save Memory. API keys are not sent to the repository.
+
+
+## Current incremental capabilities
+
+- Streaming responses use provider-specific SSE endpoints. Gemini uses `streamGenerateContent?alt=sse`, OpenAI-compatible providers use `stream: true`, and Claude uses its Messages streaming flag.
+- Continuous dictation is user-started, foreground-only, and stops when the Activity pauses. It places recognized text in the composer; the user still chooses when to send it.
+- Screen capture is one-shot and uses Android's MediaProjection consent dialog plus a foreground service notification. No persistent or silent screen recording is implemented.
+- Text document import is user-selected and capped at 120 KB. Imported text and captured media are sent only when the user presses Send.
+- Obsidian retrieval ranks sections by query keyword overlap; this is lightweight lexical retrieval, not embeddings or a semantic vector database.
