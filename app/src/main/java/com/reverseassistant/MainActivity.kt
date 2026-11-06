@@ -273,7 +273,6 @@ class MainActivity : ComponentActivity() {
         var showSettings by remember { mutableStateOf(false) }
         var showPlugins by remember { mutableStateOf(false) }
         var showMcpServers by remember { mutableStateOf(false) }
-        var showMcpServers by remember { mutableStateOf(false) }
         var pluginRevision by remember { mutableIntStateOf(0) }
         var mcpRevision by remember { mutableIntStateOf(0) }
         var mcpStatus by remember { mutableStateOf("Add a trusted HTTPS MCP server to discover its tools.") }

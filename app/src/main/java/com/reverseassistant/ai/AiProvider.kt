@@ -19,7 +19,6 @@ enum class AiProvider(
     FIREWORKS("Fireworks AI", "fireworks_key", "accounts/fireworks/models/llama-v3p3-70b-instruct", "https://api.fireworks.ai/inference/v1/chat/completions"),
     CEREBRAS("Cerebras", "cerebras_key", "llama-3.3-70b", "https://api.cerebras.ai/v1/chat/completions"),
     PERPLEXITY("Perplexity", "perplexity_key", "sonar", "https://api.perplexity.ai/chat/completions"),
-    FIREWORKS("Fireworks AI", "fireworks_key", "accounts/fireworks/models/llama-v3p3-70b-instruct", "https://api.fireworks.ai/inference/v1/chat/completions"),
     SAMBANOVA("SambaNova", "sambanova_key", "Meta-Llama-3.3-70B-Instruct", "https://api.sambanova.ai/v1/chat/completions"),
     NVIDIA_NIM("NVIDIA NIM", "nvidia_nim_key", "meta/llama-3.3-70b-instruct", "https://integrate.api.nvidia.com/v1/chat/completions"),
     LOCAL_LLAMA("On-device LLM", "local_llama", "GGUF model"),
