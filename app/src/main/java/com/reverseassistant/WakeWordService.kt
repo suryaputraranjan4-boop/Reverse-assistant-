@@ -23,6 +23,7 @@ import java.util.Locale
 class WakeWordService : Service() {
     companion object {
         const val ACTION_STOP = "com.reverseassistant.STOP_WAKE_WORD"
+        @Volatile var active: Boolean = false
         @Volatile var onCommand: ((String) -> Unit)? = null
         @Volatile var onStopped: (() -> Unit)? = null
         private const val CHANNEL_ID = "wake_word"
@@ -42,6 +43,7 @@ class WakeWordService : Service() {
             stopListening()
             return START_NOT_STICKY
         }
+        active = true
         createChannel()
         val stopIntent = Intent(this, WakeWordService::class.java).setAction(ACTION_STOP)
         val stopPending = PendingIntent.getService(
@@ -145,6 +147,7 @@ class WakeWordService : Service() {
         handler.removeCallbacksAndMessages(null)
         try { recognizer?.destroy() } catch (_: Exception) { }
         recognizer = null
+        active = false
         onStopped?.invoke()
         onStopped = null
         super.onDestroy()
