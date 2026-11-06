@@ -249,6 +249,8 @@ class MainActivity : ComponentActivity() {
         var speakReplies by remember { mutableStateOf(settingsPrefs.getBoolean("speak_replies", true)) }
         var assistantPersona by remember { mutableStateOf(settingsPrefs.getString("assistant_persona", "Helpful, clear, and concise") ?: "Helpful, clear, and concise") }
         var liveListening by remember { mutableStateOf(false) }
+        var continuousScreen by remember { mutableStateOf(false) }
+        var continuousScreenRequested by remember { mutableStateOf(false) }
         var avatarSpeaking by remember { mutableStateOf(false) }
         var speechRate by remember { mutableFloatStateOf(settingsPrefs.getFloat("speech_rate", 1.0f).coerceIn(0.6f, 1.5f)) }
         var speechPitch by remember { mutableFloatStateOf(settingsPrefs.getFloat("speech_pitch", 1.0f).coerceIn(0.7f, 1.4f)) }
@@ -297,23 +299,38 @@ class MainActivity : ComponentActivity() {
         }
         val screenCapture = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             if (result.resultCode == RESULT_OK && result.data != null) {
-                ScreenCaptureService.onScreenshot = { bytes ->
-                    if (bytes != null) {
+                if (continuousScreenRequested) {
+                    ScreenCaptureService.onScreenshot = null
+                    ScreenCaptureService.onFrame = { bytes ->
                         image = bytes
-                        status = "Screen screenshot attached. It will be sent only when you press Send."
-                    } else {
-                        status = "Screen capture did not complete. Try again."
+                        continuousScreen = true
+                        status = "Live screen sharing is active. Latest frame is attached to your next message."
+                    }
+                } else {
+                    ScreenCaptureService.onFrame = null
+                    ScreenCaptureService.onScreenshot = { bytes ->
+                        if (bytes != null) {
+                            image = bytes
+                            status = "Screen screenshot attached. It will be sent only when you press Send."
+                        } else {
+                            status = "Screen capture did not complete. Try again."
+                        }
                     }
                 }
                 try {
                     val serviceIntent = Intent(this@MainActivity, ScreenCaptureService::class.java)
                         .putExtra(ScreenCaptureService.EXTRA_RESULT_CODE, result.resultCode)
                         .putExtra(ScreenCaptureService.EXTRA_DATA, result.data)
+                        .putExtra(ScreenCaptureService.EXTRA_CONTINUOUS, continuousScreenRequested)
                     startForegroundService(serviceIntent)
-                    status = "Capturing the screen you approved…"
+                    status = if (continuousScreenRequested) "Starting live screen sharing…" else "Capturing the screen you approved…"
                 } catch (e: Exception) {
                     ScreenCaptureService.onScreenshot = null
+                    ScreenCaptureService.onFrame = null
+                    continuousScreen = false
                     status = e.message ?: "Could not start screen capture."
+                } finally {
+                    continuousScreenRequested = false
                 }
             } else {
                 status = "Screen capture cancelled."
@@ -475,6 +492,19 @@ class MainActivity : ComponentActivity() {
                             val manager = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
                             screenCapture.launch(manager.createScreenCaptureIntent())
                         }) { Text("SCREEN") }
+                        TextButton(onClick = {
+                            if (continuousScreen) {
+                                val stop = Intent(this@MainActivity, ScreenCaptureService::class.java).setAction(ScreenCaptureService.ACTION_STOP)
+                                startService(stop)
+                                ScreenCaptureService.onFrame = null
+                                continuousScreen = false
+                                status = "Live screen sharing stopped."
+                            } else {
+                                continuousScreenRequested = true
+                                val manager = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+                                screenCapture.launch(manager.createScreenCaptureIntent())
+                            }
+                        }) { Text(if (continuousScreen) "STOP LIVE SCREEN" else "LIVE SCREEN") }
                         TextButton(onClick = { documentPicker.launch(arrayOf("text/plain", "text/markdown", "text/csv", "application/json", "application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")) }) { Text("FILE") }
                         TextButton(onClick = { exportChat.launch("reverse-assistant-chat.txt") }) { Text("EXPORT CHAT") }
                         TextButton(onClick = { backupExport.launch("reverse-assistant-backup.json") }) { Text("BACKUP") }
