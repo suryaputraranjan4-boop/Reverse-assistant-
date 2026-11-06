@@ -260,6 +260,7 @@ class MainActivity : ComponentActivity() {
         var importedModelStatus by remember { mutableStateOf("") }
         var prompt by remember { mutableStateOf("") }
         var apiKey by remember { mutableStateOf("") }
+        var customEndpoint by remember { mutableStateOf(settingsPrefs.getString("custom_provider_endpoint", "") ?: "") }
         var showSettings by remember { mutableStateOf(false) }
         var showPlugins by remember { mutableStateOf(false) }
         var pluginRevision by remember { mutableIntStateOf(0) }
@@ -283,8 +284,9 @@ class MainActivity : ComponentActivity() {
                 WakeWordService.onStopped = null
             }
         }
-        LaunchedEffect(provider, model, speakReplies, speechRate, speechPitch, assistantPersona) {
+        LaunchedEffect(provider, model, speakReplies, speechRate, speechPitch, assistantPersona, customEndpoint) {
             settingsPrefs.edit().putString("provider", provider.name).putString("model", model)
+                .putString("custom_provider_endpoint", customEndpoint)
                 .putBoolean("speak_replies", speakReplies).putString("assistant_persona", assistantPersona)
                 .putFloat("speech_rate", speechRate)
                 .putFloat("speech_pitch", speechPitch).apply()
@@ -750,7 +752,7 @@ class MainActivity : ComponentActivity() {
                                         attachedDocument.take(120000) + "\n\n"
                                     val contextPrompt = "Assistant style preference: " + assistantPersona.take(300) + "\n\n" + memorySection + documentSection + actionGuide +
                                         "\n\nVisible Android screen context (only if explicitly requested):\n$screenContext\n\nRecent conversation:\n$recentChat\n\nRespond to the latest user message."
-                                    val reply = AiClient().askStreaming(provider, model, key, contextPrompt, photo) { delta ->
+                                    val reply = AiClient().askStreaming(provider, model, key, contextPrompt, photo, customEndpoint = customEndpoint) { delta ->
                                         if (!requestsPhoneControl && assistantMessageIndex in messages.indices) {
                                             messages[assistantMessageIndex] = ChatMessage(
                                                 messages[assistantMessageIndex].text + delta, false
@@ -872,12 +874,18 @@ class MainActivity : ComponentActivity() {
         if (showSettings) {
             var draft by remember { mutableStateOf(SecretStore.get(this@MainActivity, provider.secretName)) }
             var personaDraft by remember { mutableStateOf(assistantPersona) }
+            var endpointDraft by remember { mutableStateOf(customEndpoint) }
             AlertDialog(
                 onDismissRequest = { showSettings = false },
                 title = { Text("${provider.label} API key") },
                 text = { Column {
                     OutlinedTextField(value = draft, onValueChange = { draft = it }, label = { Text("API key") }, singleLine = true)
                     Text("Stored encrypted with Android Keystore. Never commit API keys.", style = MaterialTheme.typography.bodySmall)
+                    if (provider == AiProvider.CUSTOM_OPENAI_COMPATIBLE) {
+                        OutlinedTextField(value = endpointDraft, onValueChange = { endpointDraft = it.take(500) },
+                            label = { Text("HTTPS chat-completions endpoint") }, singleLine = true)
+                        Text("Only trusted HTTPS OpenAI-compatible endpoints are accepted.", style = MaterialTheme.typography.bodySmall)
+                    }
                     OutlinedTextField(value = personaDraft, onValueChange = { personaDraft = it.take(300) }, label = { Text("Assistant personality / style") }, minLines = 2)
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(checked = speakReplies, onCheckedChange = { speakReplies = it })
@@ -890,6 +898,7 @@ class MainActivity : ComponentActivity() {
                 } },
                 confirmButton = { TextButton(onClick = {
                     SecretStore.put(this@MainActivity, provider.secretName, draft)
+                    if (provider == AiProvider.CUSTOM_OPENAI_COMPATIBLE) customEndpoint = endpointDraft.trim()
                     assistantPersona = personaDraft
                     apiKey = draft; showSettings = false; status = "Settings saved on this device."
                 }) { Text("SAVE") } },
