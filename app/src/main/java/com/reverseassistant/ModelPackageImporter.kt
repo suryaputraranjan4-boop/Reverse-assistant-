@@ -17,13 +17,15 @@ object ModelPackageImporter {
     data class Result(
         val folderName: String,
         val pmxCount: Int,
+        val pmdCount: Int,
         val textureCount: Int,
         val nestedArchiveCount: Int,
         val expandedBytes: Long,
-        val firstPmxPath: String
+        val firstModelPath: String,
+        val firstPmxPath: String?
     ) {
         val summary: String get() =
-            "$pmxCount PMX model(s), $textureCount texture(s), $nestedArchiveCount nested archive(s)"
+            "$pmxCount PMX model(s), $pmdCount PMD model(s), $textureCount texture(s), $nestedArchiveCount nested archive(s)"
     }
 
     private const val MAX_INPUT_BYTES = 300L * 1024L * 1024L
@@ -39,14 +41,23 @@ object ModelPackageImporter {
             context.contentResolver.openInputStream(uri)?.use { input ->
                 extract(input, folder, folder, 0, budget)
             } ?: error("Could not open the selected model package.")
-            val pmxFiles = folder.walkTopDown().filter { it.isFile && it.extension.equals("pmx", true) }.toList()
-            val pmx = pmxFiles.size
-            val firstPmx = pmxFiles.firstOrNull()
+            val modelFiles = folder.walkTopDown()
+                .filter { it.isFile && it.extension.lowercase() in setOf("pmx", "pmd") }
+                .toList()
+            val pmxFiles = modelFiles.filter { it.extension.equals("pmx", true) }
+            val pmdFiles = modelFiles.filter { it.extension.equals("pmd", true) }
+            // Prefer PMX because the full Babylon MMD viewer supports PMX + VMD playback.
+            // PMD is still imported and previewed through the native Assimp mesh path.
+            val firstModel = pmxFiles.firstOrNull() ?: pmdFiles.firstOrNull()
             val textures = folder.walkTopDown().count {
                 it.isFile && it.extension.lowercase() in setOf("png", "jpg", "jpeg", "bmp", "tga", "dds")
             }
-            require(pmx > 0 && firstPmx != null) { "No PMX model was found in this archive. Choose a PMX model ZIP." }
-            return Result(folder.name, pmx, textures, budget.nestedArchives, budget.bytes, firstPmx.absolutePath)
+            require(firstModel != null) { "No PMX or PMD model was found in this archive. Choose a PMX/PMD model ZIP." }
+            return Result(
+                folder.name, pmxFiles.size, pmdFiles.size, textures,
+                budget.nestedArchives, budget.bytes, firstModel.absolutePath,
+                pmxFiles.firstOrNull()?.absolutePath
+            )
         } catch (error: Exception) {
             folder.deleteRecursively()
             throw error
