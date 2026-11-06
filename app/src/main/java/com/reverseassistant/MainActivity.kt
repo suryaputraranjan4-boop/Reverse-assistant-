@@ -259,6 +259,8 @@ class MainActivity : ComponentActivity() {
         var prompt by remember { mutableStateOf("") }
         var apiKey by remember { mutableStateOf("") }
         var showSettings by remember { mutableStateOf(false) }
+        var showPlugins by remember { mutableStateOf(false) }
+        var pluginRevision by remember { mutableIntStateOf(0) }
         var showProviderMenu by remember { mutableStateOf(false) }
         var image by remember { mutableStateOf<ByteArray?>(null) }
         var status by remember { mutableStateOf("Choose an AI provider and add its API key in Settings.") }
@@ -443,7 +445,10 @@ class MainActivity : ComponentActivity() {
                 topBar = {
                     TopAppBar(
                         title = { Column { Text("REVERSE ASSISTANT"); Text("Android AI companion", style = MaterialTheme.typography.labelSmall) } },
-                        actions = { TextButton(onClick = { showSettings = true }) { Text("SETTINGS") } },
+                        actions = {
+                            TextButton(onClick = { showPlugins = true }) { Text("PLUGINS") }
+                            TextButton(onClick = { showSettings = true }) { Text("SETTINGS") }
+                        },
                         colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF171722), titleContentColor = Color.White)
                     )
                 },
@@ -534,12 +539,12 @@ class MainActivity : ComponentActivity() {
                             }
                             try { voice.launch(intent) } catch (_: Exception) { status = "No speech recognition app is available." }
                         }) { Icon(Icons.Default.Mic, "Voice input", tint = Color.White) }
-                        TextButton(onClick = {
+                        TextButton(enabled = PluginRegistry.isEnabled(this@MainActivity, "obsidian"), onClick = {
                             if (lastReply.isBlank()) status = "Ask something first."
                             else try { ObsidianVault.appendMemory(this@MainActivity, "Conversation note", lastReply); status = "Saved to Obsidian." }
                             catch (e: Exception) { status = e.message ?: "Connect Obsidian first." }
                         }) { Text("SAVE MEMORY") }
-                        TextButton(enabled = !busy && prompt.isNotBlank(), onClick = {
+                        TextButton(enabled = !busy && prompt.isNotBlank() && PluginRegistry.isEnabled(this@MainActivity, "web_search"), onClick = {
                             val query = prompt.trim()
                             busy = true
                             status = "Searching the web…"
@@ -567,7 +572,7 @@ class MainActivity : ComponentActivity() {
                             image = null
                             scope.launch {
                                 try {
-                                    val savedMemory = ObsidianVault.readRelevantMemory(this@MainActivity, text)
+                                    val savedMemory = if (PluginRegistry.isEnabled(this@MainActivity, "obsidian")) ObsidianVault.readRelevantMemory(this@MainActivity, text) else ""
                                     val recentChat = messages.dropLast(1).takeLast(12).joinToString("\n") {
                                         (if (it.fromUser) "User: " else "Assistant: ") + it.text
                                     }
@@ -575,7 +580,7 @@ class MainActivity : ComponentActivity() {
                                         "Relevant user-approved Obsidian memory (use only when relevant):\n$savedMemory\n\n"
                                     // Screen contents are private. Do not inspect or send them to a cloud
                                     // provider unless the user explicitly asks for phone-control help.
-                                    val requestsPhoneControl = isExplicitPhoneControlRequest(text)
+                                    val requestsPhoneControl = isExplicitPhoneControlRequest(text) && PluginRegistry.isEnabled(this@MainActivity, "phone_actions")
                                     val screenContext = if (requestsPhoneControl) {
                                         TouchControlService.active?.screenContext()
                                             ?: "Touch service is not enabled; no screen context is available."
@@ -680,6 +685,41 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             }
+        }
+
+        if (showPlugins) {
+            val enabledPlugins = PluginRegistry.plugins.associate { plugin ->
+                plugin.id to PluginRegistry.isEnabled(this@MainActivity, plugin.id)
+            }
+            AlertDialog(
+                onDismissRequest = { showPlugins = false },
+                title = { Text("IN-APP PLUGINS") },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        PluginRegistry.plugins.forEach { plugin ->
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Column(Modifier.weight(1f)) {
+                                    Text(plugin.name, style = MaterialTheme.typography.titleSmall)
+                                    Text(plugin.description, style = MaterialTheme.typography.bodySmall)
+                                }
+                                Checkbox(
+                                    checked = enabledPlugins[plugin.id] == true,
+                                    onCheckedChange = { checked ->
+                                        PluginRegistry.setEnabled(this@MainActivity, plugin.id, checked)
+                                        pluginRevision++
+                                    }
+                                )
+                            }
+                        }
+                        Text(
+                            "These are built-in capability modules. External MCP/plugin servers are not connected by this switch.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                },
+                confirmButton = { TextButton(onClick = { showPlugins = false }) { Text("DONE") } }
+            )
         }
 
         if (showSettings) {
