@@ -21,11 +21,11 @@ This is an initial Android project foundation, not a finished or production-read
 
 Requirements: JDK 17, Android SDK Platform 35 and Build Tools, Android Gradle Plugin 8.9.2 / Gradle 8.11.1.
 
-Build a debug APK:
+Build a debug APK after installing Gradle 8.11.1:
 
-    ./gradlew assembleDebug
+    gradle assembleDebug
 
-The GitHub Actions workflow builds the debug APK on pushes and pull requests. A successful CI build is not a substitute for testing on the target phone.
+The GitHub Actions workflow also builds and uploads a debug APK on pushes and pull requests. A successful CI build is not a substitute for testing on the target phone.
 
 ## Permissions and privacy
 
