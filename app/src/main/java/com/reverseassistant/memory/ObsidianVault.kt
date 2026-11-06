@@ -56,7 +56,7 @@ object ObsidianVault {
                 val score = terms.sumOf { term -> if (text.contains(term)) 1 else 0 }
                 Triple(index, score, section)
             }.filter { it.second > 0 }.sortedWith(compareByDescending<Triple<Int, Int, String>> { it.second }.thenByDescending { it.first })
-            val selected = ranked.take(6).sortedBy { it.first }.joinToString("\\n\\n") { it.third }
+            val selected = ranked.take(6).sortedBy { it.first }.joinToString("\n\n") { it.third }
             (if (selected.isBlank()) all.takeLast(maxChars) else selected).takeLast(maxChars)
         } catch (_: Exception) { "" }
     }
