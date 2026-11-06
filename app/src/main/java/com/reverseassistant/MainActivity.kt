@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.reverseassistant.ai.AiClient
 import com.reverseassistant.ai.AiProvider
+import com.reverseassistant.mcp.McpServerDialog
 import com.reverseassistant.memory.ObsidianVault
 import com.reverseassistant.mcp.McpServerClient
 import com.reverseassistant.mcp.McpServerConfig
@@ -268,6 +269,7 @@ class MainActivity : ComponentActivity() {
         var customEndpoint by remember { mutableStateOf(settingsPrefs.getString("custom_provider_endpoint", "") ?: "") }
         var showSettings by remember { mutableStateOf(false) }
         var showPlugins by remember { mutableStateOf(false) }
+        var showMcpServers by remember { mutableStateOf(false) }
         var showMcpServers by remember { mutableStateOf(false) }
         var pluginRevision by remember { mutableIntStateOf(0) }
         var mcpRevision by remember { mutableIntStateOf(0) }
@@ -956,6 +958,10 @@ class MainActivity : ComponentActivity() {
                 },
                 dismissButton = { TextButton(onClick = { showMcpServers = false }) { Text("DONE") } }
             )
+        }
+
+        if (showMcpServers) {
+            McpServerDialog(context = this@MainActivity, onDismiss = { showMcpServers = false })
         }
 
         if (showSettings) {
