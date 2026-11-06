@@ -2,6 +2,14 @@
 
 Android-first personal AI assistant. This repository is the clean implementation target for the requirements collected in the project chats.
 
+## Recently implemented capabilities
+
+- Ranked web search: user-triggered DuckDuckGo HTML results with titles, snippets, and source links (network/rate-limit dependent).
+- Multi-step phone action plans: up to five allow-listed actions, shown one at a time; each step requires a separate user confirmation. Failed/cancelled steps stop the remaining plan.
+- Foreground wake phrase: while the user has manually started LIVE MIC in the foreground, speech recognition recognizes “Hey Reverse”, “Hello Reverse”, or “OK Reverse” and forwards the spoken command. This is not an always-on/background wake-word engine.
+- Continuous screen capture: explicit Android MediaProjection consent starts a foreground service; frames are sampled locally and the latest frame is attached only to the next user-sent message. A persistent notification provides Stop sharing. This is not an unattended cloud video stream.
+- Built-in plugin registry: toggles for web search, Obsidian memory, phone actions, and screen context. These are local in-app capabilities, not external MCP/plugin-server connections.
+
 ## Product direction
 
 - Android-native assistant with a conversational UI.
