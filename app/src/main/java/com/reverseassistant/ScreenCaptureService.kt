@@ -36,6 +36,12 @@ class ScreenCaptureService : Service() {
     private var reader: ImageReader? = null
     private var display: VirtualDisplay? = null
     private var captured = false
+    private var finished = false
+    private val projectionCallback = object : MediaProjection.Callback() {
+        override fun onStop() {
+            if (!finished) finishCapture(null)
+        }
+    }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -68,6 +74,7 @@ class ScreenCaptureService : Service() {
         try {
             val manager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
             projection = manager.getMediaProjection(resultCode, data)
+            projection?.registerCallback(projectionCallback, handler)
             val metrics = DisplayMetrics()
             @Suppress("DEPRECATION")
             (getSystemService(Context.WINDOW_SERVICE) as WindowManager).defaultDisplay.getRealMetrics(metrics)
@@ -114,7 +121,8 @@ class ScreenCaptureService : Service() {
     }
 
     private fun finishCapture(bytes: ByteArray?) {
-        if (bytes == null && captured) return
+        if (finished) return
+        finished = true
         onScreenshot?.invoke(bytes)
         onScreenshot = null
         stopSelf()
@@ -132,6 +140,7 @@ class ScreenCaptureService : Service() {
     override fun onDestroy() {
         try { display?.release() } catch (_: Exception) { }
         try { reader?.close() } catch (_: Exception) { }
+        try { projection?.unregisterCallback(projectionCallback) } catch (_: Exception) { }
         try { projection?.stop() } catch (_: Exception) { }
         display = null
         reader = null
