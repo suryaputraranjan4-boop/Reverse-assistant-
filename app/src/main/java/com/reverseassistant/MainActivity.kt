@@ -1,8 +1,13 @@
 package com.reverseassistant
 
+import android.Manifest
 import android.content.Intent
 import android.os.Bundle
 import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
+import android.speech.RecognitionListener
+import android.os.Handler
+import android.os.Looper
 import android.speech.tts.TextToSpeech
 import android.provider.Settings
 import androidx.activity.ComponentActivity
@@ -88,6 +93,107 @@ private fun isExplicitPhoneControlRequest(message: String): Boolean {
 
 class MainActivity : ComponentActivity() {
     private var tts: TextToSpeech? = null
+    private var speechRecognizer: SpeechRecognizer? = null
+    private var continuousListening = false
+    private var speechTextCallback: ((String) -> Unit)? = null
+    private var speechStatusCallback: ((String) -> Unit)? = null
+    private var listeningStateCallback: ((Boolean) -> Unit)? = null
+    private val speechHandler = Handler(Looper.getMainLooper())
+    private var speechRestart: Runnable? = null
+
+    private fun startContinuousListening(
+        onText: (String) -> Unit,
+        onStatus: (String) -> Unit,
+        onState: (Boolean) -> Unit
+    ) {
+        if (continuousListening) return
+        if (!SpeechRecognizer.isRecognitionAvailable(this)) {
+            onStatus("No speech recognition service is available.")
+            return
+        }
+        continuousListening = true
+        speechTextCallback = onText
+        speechStatusCallback = onStatus
+        listeningStateCallback = onState
+        onState(true)
+        onStatus("Live microphone active while this screen is open. Tap Stop Mic to end.")
+        try {
+            speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this).also { recognizer ->
+                recognizer.setRecognitionListener(object : RecognitionListener {
+                    override fun onReadyForSpeech(params: Bundle?) { speechStatusCallback?.invoke("Listening…") }
+                    override fun onBeginningOfSpeech() { speechStatusCallback?.invoke("Hearing speech…") }
+                    override fun onRmsChanged(rmsdB: Float) = Unit
+                    override fun onBufferReceived(buffer: ByteArray?) = Unit
+                    override fun onEndOfSpeech() { speechStatusCallback?.invoke("Processing speech…") }
+                    override fun onEvent(eventType: Int, params: Bundle?) = Unit
+                    override fun onPartialResults(partialResults: Bundle?) {
+                        val partial = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
+                        if (!partial.isNullOrBlank()) speechTextCallback?.invoke(partial)
+                    }
+                    override fun onResults(results: Bundle?) {
+                        val spoken = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
+                        if (!spoken.isNullOrBlank()) speechTextCallback?.invoke(spoken)
+                        scheduleSpeechRestart()
+                    }
+                    override fun onError(error: Int) {
+                        if (!continuousListening) return
+                        if (error == SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS) {
+                            speechStatusCallback?.invoke("Microphone permission is missing.")
+                            stopContinuousListening()
+                            listeningStateCallback?.invoke(false)
+                        } else {
+                            scheduleSpeechRestart()
+                        }
+                    }
+                })
+                startSpeechRecognition()
+            }
+        } catch (e: Exception) {
+            onStatus(e.message ?: "Could not start live microphone.")
+            stopContinuousListening()
+            onState(false)
+        }
+    }
+
+    private fun startSpeechRecognition() {
+        if (!continuousListening) return
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
+            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+        }
+        try { speechRecognizer?.startListening(intent) }
+        catch (_: Exception) { scheduleSpeechRestart() }
+    }
+
+    private fun scheduleSpeechRestart() {
+        speechRestart?.let(speechHandler::removeCallbacks)
+        speechRestart = Runnable { startSpeechRecognition() }
+        speechHandler.postDelayed(speechRestart!!, 650)
+    }
+
+    private fun stopContinuousListening() {
+        continuousListening = false
+        speechRestart?.let(speechHandler::removeCallbacks)
+        speechRestart = null
+        try { speechRecognizer?.cancel() } catch (_: Exception) { }
+        try { speechRecognizer?.destroy() } catch (_: Exception) { }
+        speechRecognizer = null
+        speechStatusCallback?.invoke("Live microphone stopped.")
+        speechTextCallback = null
+        speechStatusCallback = null
+        listeningStateCallback = null
+    }
+
+    override fun onPause() {
+        if (continuousListening) {
+            val stateCallback = listeningStateCallback
+            stopContinuousListening()
+            stateCallback?.invoke(false)
+        }
+        super.onPause()
+    }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         tts = TextToSpeech(this) { status -> if (status == TextToSpeech.SUCCESS) tts?.language = Locale.getDefault() }
@@ -105,6 +211,7 @@ class MainActivity : ComponentActivity() {
         }
         var model by remember { mutableStateOf(settingsPrefs.getString("model", null) ?: provider.defaultModel) }
         var speakReplies by remember { mutableStateOf(settingsPrefs.getBoolean("speak_replies", true)) }
+        var liveListening by remember { mutableStateOf(false) }
         var speechRate by remember { mutableFloatStateOf(settingsPrefs.getFloat("speech_rate", 1.0f).coerceIn(0.6f, 1.5f)) }
         var speechPitch by remember { mutableFloatStateOf(settingsPrefs.getFloat("speech_pitch", 1.0f).coerceIn(0.7f, 1.4f)) }
         var attachedDocument by remember { mutableStateOf("") }
@@ -132,6 +239,18 @@ class MainActivity : ComponentActivity() {
             saveChatHistory(this@MainActivity, messages.toList())
         }
 
+        val microphonePermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) {
+                startContinuousListening(
+                    onText = { spoken -> prompt = spoken },
+                    onStatus = { message -> status = message },
+                    onState = { active -> liveListening = active }
+                )
+            } else {
+                status = "Microphone permission was not granted."
+                liveListening = false
+            }
+        }
         val camera = rememberLauncherForActivityResult(ActivityResultContracts.TakePicturePreview()) { bitmap ->
             if (bitmap != null) {
                 val out = ByteArrayOutputStream()
@@ -237,7 +356,21 @@ class MainActivity : ComponentActivity() {
                         IconButton(onClick = { camera.launch(null) }) { Icon(Icons.Default.CameraAlt, "Camera", tint = Color.White) }
                         TextButton(onClick = { documentPicker.launch(arrayOf("text/plain", "text/markdown", "text/csv", "application/json")) }) { Text("FILE") }
                         TextButton(onClick = { exportChat.launch("reverse-assistant-chat.txt") }) { Text("EXPORT") }
-                        TextButton(onClick = { tts?.stop(); status = "Speech stopped." }) { Icon(Icons.Default.Stop, "Stop speech") }
+                        TextButton(onClick = {
+                            if (liveListening) {
+                                val wasListening = liveListening
+                                stopContinuousListening()
+                                liveListening = false
+                                status = if (wasListening) "Live microphone stopped." else "Speech stopped."
+                            }
+                            tts?.stop()
+                        }) { Icon(Icons.Default.Stop, "Stop speech and microphone") }
+                        TextButton(onClick = {
+                            if (liveListening) {
+                                stopContinuousListening()
+                                liveListening = false
+                            } else microphonePermission.launch(Manifest.permission.RECORD_AUDIO)
+                        }) { Text(if (liveListening) "STOP MIC" else "LIVE MIC") }
                         IconButton(onClick = {
                             val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
                                 putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
