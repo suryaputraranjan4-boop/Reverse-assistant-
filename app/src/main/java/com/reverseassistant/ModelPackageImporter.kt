@@ -8,6 +8,7 @@ import java.io.FileOutputStream
 import java.io.InputStream
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
+import java.util.UUID
 
 /**
  * Imports PMX/MMD model packages into app-private storage. Archives are never uploaded or committed.
@@ -35,7 +36,7 @@ object ModelPackageImporter {
 
     fun import(context: Context, uri: Uri): Result {
         val root = File(context.filesDir, "imported-models").apply { mkdirs() }
-        val folder = File(root, "model-${System.currentTimeMillis()}").apply { mkdirs() }
+        val folder = File(root, "model-${UUID.randomUUID()}").apply { mkdirs() }
         val budget = Budget()
         try {
             context.contentResolver.openInputStream(uri)?.use { input ->
@@ -79,10 +80,12 @@ object ModelPackageImporter {
                 val rootPath = root.canonicalPath + File.separator
                 require(output.path.startsWith(rootPath) || output == root) { "Unsafe archive path rejected." }
                 if (item.isDirectory) {
+                    require(!output.exists() || output.isDirectory) { "Archive entry conflicts with an existing file." }
                     output.mkdirs()
                     zip.closeEntry()
                     continue
                 }
+                require(!output.exists()) { "Duplicate archive file entry rejected: ${item.name}" }
                 output.parentFile?.mkdirs()
                 var fileBytes = 0L
                 FileOutputStream(output).use { sink ->
