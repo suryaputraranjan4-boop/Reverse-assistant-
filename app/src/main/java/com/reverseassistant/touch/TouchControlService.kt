@@ -61,22 +61,56 @@ class TouchControlService : AccessibilityService() {
         return try { startActivity(launchIntent); true } catch (_: Exception) { false }
     }
 
+    /**
+     * Resolve the visible label first, then click its nearest clickable ancestor.
+     * Many Android apps put the text in a child TextView while the actual button
+     * is the parent container; tapping only the TextView silently misses those.
+     * Ambiguous matches are rejected rather than guessing.
+     */
     fun tapText(target: String): Boolean {
+        val query = target.trim()
+        if (query.isBlank()) return false
         val root = rootInActiveWindow ?: return false
-        return clickMatchingNode(root, target.trim().lowercase())
-    }
-
-    private fun clickMatchingNode(node: android.view.accessibility.AccessibilityNodeInfo?, target: String): Boolean {
-        if (node == null || target.isBlank()) return false
-        val labels = listOf(node.text?.toString(), node.contentDescription?.toString())
-            .filterNotNull().map { it.trim().lowercase() }
-        if (labels.any { it == target || it.contains(target) } && node.isClickable) {
-            return node.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK)
-        }
-        for (i in 0 until node.childCount) {
-            if (clickMatchingNode(node.getChild(i), target)) return true
+        val matches = try {
+            root.findAccessibilityNodeInfosByText(query).orEmpty()
+                .filter { it.isVisibleToUser }
+        } catch (_: Exception) { emptyList() }
+        if (matches.size != 1) return false
+        var candidate: android.view.accessibility.AccessibilityNodeInfo? = matches.single()
+        var depth = 0
+        while (candidate != null && depth++ < 8) {
+            if (candidate.isVisibleToUser && candidate.isEnabled && candidate.isClickable) {
+                return candidate.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK)
+            }
+            candidate = candidate.parent
         }
         return false
+    }
+
+    /** Prefer the app's actual scroll container over a guessed centre-screen swipe. */
+    private fun scrollContainer(forward: Boolean): Boolean {
+        val root = rootInActiveWindow ?: return false
+        val candidates = mutableListOf<android.view.accessibility.AccessibilityNodeInfo>()
+        collectScrollable(root, candidates)
+        val target = candidates.maxByOrNull { it.boundsArea() } ?: return false
+        val action = if (forward) android.view.accessibility.AccessibilityNodeInfo.ACTION_SCROLL_FORWARD
+            else android.view.accessibility.AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD
+        return target.performAction(action)
+    }
+
+    private fun collectScrollable(
+        node: android.view.accessibility.AccessibilityNodeInfo?,
+        out: MutableList<android.view.accessibility.AccessibilityNodeInfo>
+    ) {
+        if (node == null) return
+        if (node.isVisibleToUser && node.isEnabled && node.isScrollable) out.add(node)
+        for (i in 0 until node.childCount) collectScrollable(node.getChild(i), out)
+    }
+
+    private fun android.view.accessibility.AccessibilityNodeInfo.boundsArea(): Long {
+        val bounds = android.graphics.Rect()
+        getBoundsInScreen(bounds)
+        return bounds.width().toLong().coerceAtLeast(0) * bounds.height().toLong().coerceAtLeast(0)
     }
 
     fun tap(x: Float, y: Float): Boolean = dispatch(points = listOf(Stroke(x,y,0,70)))
@@ -94,8 +128,8 @@ class TouchControlService : AccessibilityService() {
     fun swipe(x1: Float, y1: Float, x2: Float, y2: Float, durationMs: Long = 420): Boolean =
         dispatch(points = listOf(Stroke(x1,y1,0,durationMs.coerceIn(150,1500),x2,y2)))
 
-    fun scrollUp(): Boolean = swipe(0.5f,0.78f,0.5f,0.28f)
-    fun scrollDown(): Boolean = swipe(0.5f,0.28f,0.5f,0.78f)
+    fun scrollUp(): Boolean = scrollContainer(true) || swipe(0.5f,0.78f,0.5f,0.28f)
+    fun scrollDown(): Boolean = scrollContainer(false) || swipe(0.5f,0.28f,0.5f,0.78f)
     fun drag(x1: Float, y1: Float, x2: Float, y2: Float, durationMs: Long = 700): Boolean =
         swipe(x1,y1,x2,y2,durationMs)
 
