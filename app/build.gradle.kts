@@ -50,6 +50,7 @@ dependencies {
     implementation("com.alphacephei:vosk-android:0.3.75@aar")
     implementation("org.jsoup:jsoup:1.18.3")
     implementation(project(":offline-llm"))
+    implementation(project(":model-runtime"))
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.1")
     debugImplementation("androidx.compose.ui:ui-tooling")
     testImplementation("junit:junit:4.13.2")

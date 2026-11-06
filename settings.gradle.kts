@@ -6,4 +6,4 @@ dependencyResolutionManagement {
     repositories { google(); mavenCentral() }
 }
 rootProject.name = "ReverseAssistant"
-include(":app", ":offline-llm")
+include(":app", ":offline-llm", ":model-runtime")
