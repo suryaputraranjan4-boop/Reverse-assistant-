@@ -423,6 +423,7 @@ class MainActivity : ComponentActivity() {
                     geminiLiveSession?.close()
                     geminiLiveSession = null
                 }
+                liveAiVideo = false
                 status = "Screen capture cancelled."
             }
         }
@@ -793,7 +794,7 @@ class MainActivity : ComponentActivity() {
                                                 status = "Gemini Live: $error"
                                                 startService(Intent(this@MainActivity, ScreenCaptureService::class.java).setAction(ScreenCaptureService.ACTION_STOP))
                                                 liveAiVideo = false
-                                                liveAiVideoRequested = false
+                                                geminiLiveSession = null
                                             }
                                         }
                                     )
