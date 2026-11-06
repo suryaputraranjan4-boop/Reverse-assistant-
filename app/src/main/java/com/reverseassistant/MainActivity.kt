@@ -36,6 +36,27 @@ import kotlinx.coroutines.launch
 
 data class ChatMessage(val text: String, val fromUser: Boolean)
 
+private fun isExplicitPhoneControlRequest(message: String): Boolean {
+    val text = message.lowercase(Locale.ROOT)
+    val directPhrases = listOf(
+        "control my phone", "operate my phone", "use my phone",
+        "control this phone", "operate this phone",
+        "tap the screen", "click the screen", "swipe the screen",
+        "scroll the screen", "long press", "double tap",
+        "screen par tap", "screen pe tap", "tap karo", "click karo",
+        "scroll karo", "swipe karo", "app kholo", "app open karo",
+        "phone chalao", "phone operate karo", "phone control karo",
+        "button dabao", "screen par click"
+    )
+    if (directPhrases.any(text::contains)) return true
+    val hasDevice = listOf("phone", "mobile", "screen", "app").any(text::contains)
+    val hasAction = listOf(
+        "open", "launch", "tap", "click", "scroll", "swipe",
+        "press", "drag", "navigate", "kholo", "dabao", "chalao"
+    ).any(text::contains)
+    return hasDevice && hasAction
+}
+
 class MainActivity : ComponentActivity() {
     private var tts: TextToSpeech? = null
     override fun onCreate(savedInstanceState: Bundle?) {
