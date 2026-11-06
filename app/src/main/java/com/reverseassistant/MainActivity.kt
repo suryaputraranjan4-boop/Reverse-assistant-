@@ -109,6 +109,7 @@ class MainActivity : ComponentActivity() {
     private var listeningStateCallback: ((Boolean) -> Unit)? = null
     private val speechHandler = Handler(Looper.getMainLooper())
     private var speechRestart: Runnable? = null
+    private val wakePhrases = listOf("hey reverse", "hello reverse", "ok reverse")
 
     private fun startContinuousListening(
         onText: (String) -> Unit,
@@ -141,7 +142,15 @@ class MainActivity : ComponentActivity() {
                     }
                     override fun onResults(results: Bundle?) {
                         val spoken = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
-                        if (!spoken.isNullOrBlank()) speechTextCallback?.invoke(spoken)
+                        if (!spoken.isNullOrBlank()) {
+                            val normalized = spoken.trim()
+                            val wake = wakePhrases.firstOrNull { normalized.lowercase(Locale.ROOT).startsWith(it) }
+                            if (wake != null) {
+                                val command = normalized.drop(wake.length).trim().trimStart(',', ':', '.', ' ')
+                                if (command.isNotBlank()) speechTextCallback?.invoke(command)
+                                else speechStatusCallback?.invoke("Wake phrase detected. Say your command…")
+                            } else speechTextCallback?.invoke(normalized)
+                        }
                         scheduleSpeechRestart()
                     }
                     override fun onError(error: Int) {
@@ -266,6 +275,7 @@ class MainActivity : ComponentActivity() {
             tts?.setPitch(speechPitch)
         }
         var pendingAction by remember { mutableStateOf<PhoneAction?>(null) }
+        var pendingActions by remember { mutableStateOf<List<PhoneAction>>(emptyList()) }
         val messages = remember {
             mutableStateListOf<ChatMessage>().apply { addAll(loadChatHistory(this@MainActivity)) }
         }
@@ -485,7 +495,7 @@ class MainActivity : ComponentActivity() {
                                 stopContinuousListening()
                                 liveListening = false
                             } else microphonePermission.launch(Manifest.permission.RECORD_AUDIO)
-                        }) { Text(if (liveListening) "STOP MIC" else "LIVE MIC") }
+                        }) { Text(if (liveListening) "STOP MIC" else "LIVE MIC · SAY ‘HEY REVERSE’") }
                         IconButton(onClick = {
                             val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
                                 putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
@@ -544,8 +554,8 @@ class MainActivity : ComponentActivity() {
                                     }
                                     val actionGuide = if (requestsPhoneControl) """
                                         The user explicitly requested phone control. If one safe, clear action is
-                                        appropriate, return exactly one JSON object and no other text:
-                                        {"phone_action":{"type":"tap_text","target":"visible label"}}
+                                        appropriate, return a JSON plan with 1 to 5 ordered actions and no other text:
+                                        {"phone_actions":[{"type":"tap_text","target":"visible label"}]}
                                         Allowed types: launch_app, tap_text, tap, double_tap, long_press, repeat_tap, swipe, drag, scroll_up, scroll_down.
                                         For launch_app, target must be the exact visible app name.
                                         Coordinate fields x,y,x2,y2 must be normalized from 0.0 to 1.0.
@@ -570,11 +580,14 @@ class MainActivity : ComponentActivity() {
                                     }
                                     attachedDocument = ""
                                     attachedDocumentName = ""
-                                    val proposedAction = if (requestsPhoneControl) PhoneAction.parse(reply) else null
-                                    if (proposedAction != null) {
-                                        pendingAction = proposedAction
-                                        messages[assistantMessageIndex] = ChatMessage("I prepared a phone action. Review the confirmation card below before it runs.", false)
-                                        lastReply = "Proposed action: ${proposedAction.description}"
+                                    val proposedPlan = if (requestsPhoneControl) PhoneAction.parsePlan(reply) else null
+                                    if (!proposedPlan.isNullOrEmpty()) {
+                                        pendingAction = proposedPlan.first()
+                                        pendingActions = proposedPlan.drop(1)
+                                        messages[assistantMessageIndex] = ChatMessage(
+                                            "I prepared ${proposedPlan.size} phone action(s). Review and confirm each step individually.", false
+                                        )
+                                        lastReply = "Proposed phone plan: ${proposedPlan.joinToString(" → ") { it.description }}"
                                     } else {
                                         messages[assistantMessageIndex] = ChatMessage(reply, false)
                                         lastReply = reply
@@ -592,7 +605,8 @@ class MainActivity : ComponentActivity() {
                     if (pendingAction != null) {
                         Surface(color = Color(0xFF2A2638), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth()) {
                             Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Text("AI phone action proposal", color = Color(0xFFB7A1FF), style = MaterialTheme.typography.labelLarge)
+                                Text("AI PHONE ACTION PLAN · STEP", color = Color(0xFFB7A1FF), style = MaterialTheme.typography.labelLarge)
+                                Text("${pendingActions.size + 1} step(s) remaining including this one", color = Color.LightGray, style = MaterialTheme.typography.bodySmall)
                                 Text(pendingAction!!.description, color = Color.White)
                                 Text("Check the screen before confirming. Nothing runs until you tap Confirm.", color = Color.LightGray, style = MaterialTheme.typography.bodySmall)
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -603,11 +617,22 @@ class MainActivity : ComponentActivity() {
                                             status = "Enable Reverse Assistant touch controls in Android Accessibility settings first."
                                         } else {
                                             val ok = action.execute(service)
-                                            status = if (ok) "Confirmed action was dispatched." else "Android could not dispatch that action."
+                                            status = if (ok) "Step confirmed and dispatched." else "Android could not dispatch that action."
+                                            if (ok) {
+                                                pendingAction = pendingActions.firstOrNull()
+                                                pendingActions = pendingActions.drop(1)
+                                                if (pendingAction == null) status = "All confirmed phone-plan steps have been dispatched."
+                                            } else {
+                                                pendingAction = null
+                                                pendingActions = emptyList()
+                                            }
                                         }
-                                        pendingAction = null
+                                        if (service == null || action == null) {
+                                            pendingAction = null
+                                            pendingActions = emptyList()
+                                        }
                                     }) { Text("CONFIRM & EXECUTE") }
-                                    TextButton(onClick = { pendingAction = null; status = "Action cancelled." }) { Text("CANCEL") }
+                                    TextButton(onClick = { pendingAction = null; pendingActions = emptyList(); status = "Remaining phone-plan steps cancelled." }) { Text("CANCEL") }
                                 }
                             }
                         }
