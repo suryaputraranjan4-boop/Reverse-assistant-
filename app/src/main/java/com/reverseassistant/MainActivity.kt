@@ -265,7 +265,7 @@ class MainActivity : ComponentActivity() {
         val messages = remember {
             mutableStateListOf<ChatMessage>().apply { addAll(loadChatHistory(this@MainActivity)) }
         }
-        LaunchedEffect(messages.size) {
+        LaunchedEffect(messages.toList()) {
             saveChatHistory(this@MainActivity, messages.toList())
         }
 
