@@ -18,6 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -97,8 +98,16 @@ class MainActivity : ComponentActivity() {
     @Composable
     private fun ReverseAssistantApp() {
         val scope = rememberCoroutineScope()
-        var provider by remember { mutableStateOf(AiProvider.GEMINI) }
-        var model by remember { mutableStateOf(AiProvider.GEMINI.defaultModel) }
+        val settingsPrefs = remember { getSharedPreferences("reverse_assistant_settings", MODE_PRIVATE) }
+        var provider by remember {
+            mutableStateOf(AiProvider.values().firstOrNull { it.name == settingsPrefs.getString("provider", "GEMINI") } ?: AiProvider.GEMINI)
+        }
+        var model by remember { mutableStateOf(settingsPrefs.getString("model", null) ?: provider.defaultModel) }
+        var speakReplies by remember { mutableStateOf(settingsPrefs.getBoolean("speak_replies", true)) }
+        var speechRate by remember { mutableFloatStateOf(settingsPrefs.getFloat("speech_rate", 1.0f).coerceIn(0.6f, 1.5f)) }
+        var speechPitch by remember { mutableFloatStateOf(settingsPrefs.getFloat("speech_pitch", 1.0f).coerceIn(0.7f, 1.4f)) }
+        var attachedDocument by remember { mutableStateOf("") }
+        var attachedDocumentName by remember { mutableStateOf("") }
         var prompt by remember { mutableStateOf("") }
         var apiKey by remember { mutableStateOf("") }
         var showSettings by remember { mutableStateOf(false) }
@@ -107,6 +116,13 @@ class MainActivity : ComponentActivity() {
         var status by remember { mutableStateOf("Choose an AI provider and add its API key in Settings.") }
         var busy by remember { mutableStateOf(false) }
         var lastReply by remember { mutableStateOf("") }
+        LaunchedEffect(provider, model, speakReplies, speechRate, speechPitch) {
+            settingsPrefs.edit().putString("provider", provider.name).putString("model", model)
+                .putBoolean("speak_replies", speakReplies).putFloat("speech_rate", speechRate)
+                .putFloat("speech_pitch", speechPitch).apply()
+            tts?.setSpeechRate(speechRate)
+            tts?.setPitch(speechPitch)
+        }
         var pendingAction by remember { mutableStateOf<PhoneAction?>(null) }
         val messages = remember {
             mutableStateListOf<ChatMessage>().apply { addAll(loadChatHistory(this@MainActivity)) }
@@ -126,6 +142,39 @@ class MainActivity : ComponentActivity() {
         val voice = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             val spoken = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
             if (!spoken.isNullOrBlank()) prompt = spoken
+        }
+        val documentPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            if (uri != null) {
+                try {
+                    val input = contentResolver.openInputStream(uri) ?: error("Could not open this document.")
+                    val output = ByteArrayOutputStream()
+                    input.use { stream ->
+                        val buffer = ByteArray(8192)
+                        var total = 0
+                        while (true) {
+                            val count = stream.read(buffer)
+                            if (count <= 0 || total >= 120_000) break
+                            val allowed = minOf(count, 120_000 - total)
+                            output.write(buffer, 0, allowed)
+                            total += allowed
+                        }
+                    }
+                    attachedDocument = output.toString("UTF-8")
+                    attachedDocumentName = uri.lastPathSegment?.substringAfterLast('/')?.take(80) ?: "Attached text file"
+                    status = "Document attached (up to 120 KB). It will be sent to the selected AI provider with your next message."
+                } catch (e: Exception) { status = e.message ?: "Could not read document." }
+            }
+        }
+        val exportChat = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
+            if (uri != null) {
+                try {
+                    val transcript = messages.joinToString("\n\n") {
+                        (if (it.fromUser) "You: " else "Assistant: ") + it.text
+                    }
+                    contentResolver.openOutputStream(uri)?.use { it.write(transcript.toByteArray(Charsets.UTF_8)) }
+                    status = "Chat transcript exported."
+                } catch (e: Exception) { status = e.message ?: "Could not export chat." }
+            }
         }
         val vaultPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
             if (uri != null) {
@@ -181,9 +230,13 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                     if (image != null) Text("📷 Image attached", color = Color(0xFF80CBC4))
+                    if (attachedDocument.isNotBlank()) Text("📄 " + attachedDocumentName + " attached — sent only when you press Send", color = Color(0xFF80CBC4), style = MaterialTheme.typography.bodySmall)
                     OutlinedTextField(value = prompt, onValueChange = { prompt = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Message Reverse Assistant") }, minLines = 2)
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         IconButton(onClick = { camera.launch(null) }) { Icon(Icons.Default.CameraAlt, "Camera", tint = Color.White) }
+                        TextButton(onClick = { documentPicker.launch(arrayOf("text/plain", "text/markdown", "text/csv", "application/json")) }) { Text("FILE") }
+                        TextButton(onClick = { exportChat.launch("reverse-assistant-chat.txt") }) { Text("EXPORT") }
+                        TextButton(onClick = { tts?.stop(); status = "Speech stopped." }) { Icon(Icons.Default.Stop, "Stop speech") }
                         IconButton(onClick = {
                             val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
                                 putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
@@ -239,9 +292,14 @@ class MainActivity : ComponentActivity() {
                                         Phone control was not requested. Do not return phone_action JSON or suggest
                                         operating the device. Answer normally without accessing screen contents.
                                     """.trimIndent()
-                                    val contextPrompt = memorySection + actionGuide +
+                                    val documentSection = if (attachedDocument.isBlank()) "" else
+                                        "User-attached document (" + attachedDocumentName.take(80) + "; user explicitly attached it for this request):\n" +
+                                        attachedDocument.take(120000) + "\n\n"
+                                    val contextPrompt = memorySection + documentSection + actionGuide +
                                         "\n\nVisible Android screen context (only if explicitly requested):\n$screenContext\n\nRecent conversation:\n$recentChat\n\nRespond to the latest user message."
                                     val reply = AiClient().ask(provider, model, key, contextPrompt, photo)
+                                    attachedDocument = ""
+                                    attachedDocumentName = ""
                                     val proposedAction = if (requestsPhoneControl) PhoneAction.parse(reply) else null
                                     if (proposedAction != null) {
                                         pendingAction = proposedAction
@@ -250,7 +308,7 @@ class MainActivity : ComponentActivity() {
                                     } else {
                                         messages.add(ChatMessage(reply, false))
                                         lastReply = reply
-                                        tts?.speak(reply, TextToSpeech.QUEUE_FLUSH, Bundle(), "assistant-reply")
+                                        if (speakReplies) tts?.speak(reply, TextToSpeech.QUEUE_FLUSH, Bundle(), "assistant-reply")
                                     }
                                     status = "Ready"
                                 } catch (e: Exception) {
@@ -306,6 +364,14 @@ class MainActivity : ComponentActivity() {
                 text = { Column {
                     OutlinedTextField(value = draft, onValueChange = { draft = it }, label = { Text("API key") }, singleLine = true)
                     Text("Stored encrypted with Android Keystore. Never commit API keys.", style = MaterialTheme.typography.bodySmall)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = speakReplies, onCheckedChange = { speakReplies = it })
+                        Text("Speak AI replies")
+                    }
+                    Text("Speech speed: " + String.format(Locale.getDefault(), "%.1f", speechRate) + "×")
+                    Slider(value = speechRate, onValueChange = { speechRate = it }, valueRange = 0.6f..1.5f)
+                    Text("Speech pitch: " + String.format(Locale.getDefault(), "%.1f", speechPitch) + "×")
+                    Slider(value = speechPitch, onValueChange = { speechPitch = it }, valueRange = 0.7f..1.4f)
                 } },
                 confirmButton = { TextButton(onClick = {
                     SecretStore.put(this@MainActivity, provider.secretName, draft)
