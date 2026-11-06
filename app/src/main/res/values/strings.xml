@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">Reverse Assistant</string>
+    <string name="touch_service_description">Performs touch gestures only after you enable the service and request an action in Reverse Assistant.</string>
+</resources>
