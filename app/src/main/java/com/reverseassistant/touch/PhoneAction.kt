@@ -15,6 +15,7 @@ data class PhoneAction(
 ) {
     val description: String get() = when (type) {
         "tap_text" -> "Tap the screen item: $target"
+        "launch_app" -> "Open app: $target"
         "tap" -> "Tap at screen position"
         "double_tap" -> "Double tap at screen position"
         "long_press" -> "Long press at screen position"
@@ -27,6 +28,7 @@ data class PhoneAction(
 
     fun execute(service: TouchControlService): Boolean = when (type) {
         "tap_text" -> service.tapText(target)
+        "launch_app" -> service.launchApp(target)
         "tap" -> service.tap(x, y)
         "double_tap" -> service.doubleTap(x, y)
         "long_press" -> service.longPress(x, y, durationMs)
@@ -46,9 +48,9 @@ data class PhoneAction(
                 val root = JSONObject(response.substring(start, end + 1))
                 val obj = root.optJSONObject("phone_action") ?: root
                 val type = obj.optString("type", obj.optString("action")).lowercase()
-                if (type !in setOf("tap_text", "tap", "double_tap", "long_press", "repeat_tap", "swipe", "scroll_up", "scroll_down")) return null
+                if (type !in setOf("tap_text", "launch_app", "tap", "double_tap", "long_press", "repeat_tap", "swipe", "scroll_up", "scroll_down")) return null
                 val target = obj.optString("target")
-                if (type == "tap_text" && target.isBlank()) return null
+                if ((type == "tap_text" || type == "launch_app") && target.isBlank()) return null
                 fun coord(name: String, fallback: Double) = obj.optDouble(name, fallback).toFloat().coerceIn(0f, 1f)
                 PhoneAction(
                     type = type,
