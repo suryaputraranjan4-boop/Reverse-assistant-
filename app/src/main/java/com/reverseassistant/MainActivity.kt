@@ -97,6 +97,7 @@ private fun isExplicitPhoneControlRequest(message: String): Boolean {
 class MainActivity : ComponentActivity() {
     private var tts: TextToSpeech? = null
     private var avatarSpeakingCallback: ((Boolean) -> Unit)? = null
+    private var avatarView: Avatar3DView? = null
     private var speechRecognizer: SpeechRecognizer? = null
     private var continuousListening = false
     private var speechTextCallback: ((String) -> Unit)? = null
@@ -192,6 +193,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onPause() {
+        avatarView?.onPause()
         if (continuousListening) {
             val stateCallback = listeningStateCallback
             stopContinuousListening()
@@ -219,7 +221,8 @@ class MainActivity : ComponentActivity() {
         }
         setContent { ReverseAssistantApp() }
     }
-    override fun onDestroy() { tts?.shutdown(); super.onDestroy() }
+    override fun onResume() { super.onResume(); avatarView?.onResume() }
+    override fun onDestroy() { avatarView = null; tts?.shutdown(); super.onDestroy() }
 
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
@@ -386,7 +389,7 @@ class MainActivity : ComponentActivity() {
                     Spacer(Modifier.height(8.dp))
                     Text("3D COMPANION", color = Color(0xFFB7A1FF), style = MaterialTheme.typography.labelMedium)
                     AndroidView(
-                        factory = { context -> Avatar3DView(context) },
+                        factory = { context -> Avatar3DView(context).also { avatarView = it } },
                         update = { view -> view.setSpeaking(avatarSpeaking) },
                         modifier = Modifier.fillMaxWidth().height(180.dp).background(Color(0xFF1B1B28), RoundedCornerShape(18.dp))
                     )
