@@ -39,13 +39,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.reverseassistant.ai.AiClient
 import com.reverseassistant.ai.AiProvider
+import com.reverseassistant.mcp.McpServerDialog
 import com.reverseassistant.local.OfflineLlmManager
 import com.reverseassistant.local.OfflineModelStore
 import com.reverseassistant.local.OfflineWakeModelStore
 import com.reverseassistant.memory.ObsidianVault
-import com.reverseassistant.mcp.McpServerClient
-import com.reverseassistant.mcp.McpServerConfig
-import com.reverseassistant.mcp.McpServerRegistry
 import com.reverseassistant.security.SecretStore
 import com.reverseassistant.search.WebSearchClient
 import com.reverseassistant.touch.PhoneAction
@@ -276,8 +274,6 @@ class MainActivity : ComponentActivity() {
         var showPlugins by remember { mutableStateOf(false) }
         var showMcpServers by remember { mutableStateOf(false) }
         var pluginRevision by remember { mutableIntStateOf(0) }
-        var mcpRevision by remember { mutableIntStateOf(0) }
-        var mcpStatus by remember { mutableStateOf("Add a trusted HTTPS MCP server to discover its tools.") }
         var showProviderMenu by remember { mutableStateOf(false) }
         var image by remember { mutableStateOf<ByteArray?>(null) }
         var status by remember { mutableStateOf("Choose an AI provider and add its API key in Settings.") }
@@ -733,6 +729,9 @@ class MainActivity : ComponentActivity() {
                                 wakeWordPermission.launch(Manifest.permission.RECORD_AUDIO)
                             }
                         }) { Text(if (wakeWordActive) "STOP WAKE WORD" else "WAKE WORD") }
+                        TextButton(enabled = !busy, onClick = {
+                            offlineWakeModelPicker.launch(arrayOf("application/zip", "application/x-zip-compressed", "application/octet-stream"))
+                        }) { Text(if (offlineWakeModelPath.isBlank()) "IMPORT VOSK MODEL" else "CHANGE VOSK MODEL") }
                         TextButton(onClick = {
                             if (liveListening) {
                                 val wasListening = liveListening
@@ -955,77 +954,7 @@ class MainActivity : ComponentActivity() {
         }
 
         if (showMcpServers) {
-            var nameDraft by remember { mutableStateOf("") }
-            var endpointDraft by remember { mutableStateOf("") }
-            var tokenDraft by remember { mutableStateOf("") }
-            val savedServers = remember(mcpRevision) { McpServerRegistry.list(this@MainActivity) }
-            AlertDialog(
-                onDismissRequest = { showMcpServers = false },
-                title = { Text("EXTERNAL MCP SERVERS") },
-                text = {
-                    Column(
-                        Modifier.heightIn(max = 520.dp).verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(9.dp)
-                    ) {
-                        Text("Servers connect over MCP Streamable HTTP. Only add endpoints you trust. Tool calls are not run automatically.", style = MaterialTheme.typography.bodySmall)
-                        OutlinedTextField(value = nameDraft, onValueChange = { nameDraft = it.take(80) }, label = { Text("Server name") }, singleLine = true)
-                        OutlinedTextField(value = endpointDraft, onValueChange = { endpointDraft = it.take(500) }, label = { Text("HTTPS MCP endpoint") }, singleLine = true)
-                        OutlinedTextField(value = tokenDraft, onValueChange = { tokenDraft = it.take(2000) }, label = { Text("Bearer token (optional)") }, singleLine = true)
-                        Text("Bearer tokens are encrypted locally with Android Keystore. Remote HTTP is blocked; localhost HTTP is allowed for development.", style = MaterialTheme.typography.bodySmall)
-                        savedServers.forEach { server ->
-                            Surface(color = Color(0xFF1A2638), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth()) {
-                                Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                                    Text(server.name, style = MaterialTheme.typography.titleSmall)
-                                    Text(server.endpoint, style = MaterialTheme.typography.bodySmall)
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Text("Enabled", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
-                                        Switch(checked = server.enabled, onCheckedChange = {
-                                            McpServerRegistry.setEnabled(this@MainActivity, server.id, it)
-                                            mcpRevision++
-                                        })
-                                        TextButton(onClick = {
-                                            scope.launch {
-                                                mcpStatus = "Connecting to ${server.name}…"
-                                                try {
-                                                    val tools = withContext(Dispatchers.IO) {
-                                                        McpServerClient(McpServerConfig(server.name, server.endpoint, McpServerRegistry.bearerToken(this@MainActivity, server.id))).use { client ->
-                                                            client.initialize()
-                                                            client.listTools()
-                                                        }
-                                                    }
-                                                    mcpStatus = "Connected to ${server.name}. Discovered ${tools.size} tool(s): " +
-                                                        tools.take(12).joinToString { it.name }
-                                                } catch (error: Exception) {
-                                                    mcpStatus = "Connection failed: ${error.message?.take(220) ?: "Unknown error"}"
-                                                }
-                                            }
-                                        }) { Text("TEST") }
-                                        TextButton(onClick = {
-                                            McpServerRegistry.remove(this@MainActivity, server.id)
-                                            mcpRevision++
-                                            mcpStatus = "Removed ${server.name}."
-                                        }) { Text("REMOVE") }
-                                    }
-                                }
-                            }
-                        }
-                        Text(mcpStatus, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                },
-                confirmButton = {
-                    TextButton(onClick = {
-                        try {
-                            McpServerRegistry.add(this@MainActivity, nameDraft, endpointDraft, tokenDraft)
-                            nameDraft = ""; endpointDraft = ""; tokenDraft = ""
-                            mcpRevision++
-                            mcpStatus = "MCP server saved. Tap TEST to connect and list tools."
-                        } catch (error: Exception) {
-                            mcpStatus = error.message ?: "Could not save MCP server."
-                        }
-                    }) { Text("ADD SERVER") }
-                },
-                dismissButton = { TextButton(onClick = { showMcpServers = false }) { Text("DONE") } }
-            )
+            McpServerDialog(context = this@MainActivity, onDismiss = { showMcpServers = false })
         }
 
         if (showSettings) {
