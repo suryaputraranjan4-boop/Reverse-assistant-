@@ -19,6 +19,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -226,7 +227,7 @@ class MainActivity : ComponentActivity() {
     override fun onResume() { super.onResume(); avatarView?.onResume() }
     override fun onDestroy() { avatarView = null; tts?.shutdown(); super.onDestroy() }
 
-    @OptIn(ExperimentalMaterial3Api::class)
+    @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
     @Composable
     private fun ReverseAssistantApp() {
         val scope = rememberCoroutineScope()
