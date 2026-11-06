@@ -6,23 +6,23 @@ Android-first personal AI assistant. This repository is the clean implementation
 
 - Ranked web search: user-triggered DuckDuckGo HTML results with titles, snippets, and source links (network/rate-limit dependent).
 - Multi-step phone action plans: up to five allow-listed actions, shown one at a time; each step requires a separate user confirmation. Failed/cancelled steps stop the remaining plan.
-- Foreground wake phrase: while the user has manually started LIVE MIC in the foreground, speech recognition recognizes “Hey Reverse”, “Hello Reverse”, or “OK Reverse” and forwards the spoken command. This is not an always-on/background wake-word engine.
-- Continuous screen capture: explicit Android MediaProjection consent starts a foreground service; frames are sampled locally and the latest frame is attached only to the next user-sent message. A persistent notification provides Stop sharing. This is not an unattended cloud video stream.
-- Built-in plugin registry: toggles for web search, Obsidian memory, phone actions, and screen context. These are local in-app capabilities, not external MCP/plugin-server connections.
+- Wake phrase service: user starts/stops a microphone foreground service with a persistent Stop notification. Android speech recognition listens for “Hey Reverse”, “Hello Reverse”, or “OK Reverse”; recognized commands are placed in the chat input and are never sent automatically. Recognition may use the device's configured speech service; this is not an offline keyword model.
+- Continuous screen sharing: explicit Android MediaProjection consent starts a foreground service; frames are sampled locally about every 1.5 seconds and the latest frame is attached only to the next user-sent message. A persistent notification provides Stop sharing. This is not a continuous video stream to the AI provider.
+- Built-in plugin registry: toggles for web search, Obsidian memory, phone actions, and screen context. These are local in-app capability modules, not external MCP/plugin-server connections.
 
 ## Product direction
 
 - Android-native assistant with a conversational UI.
 - Provider switcher for Google Gemini, OpenAI, Anthropic Claude, and OpenRouter.
-- Camera capture and one-shot Android MediaProjection screenshot capture after explicit OS consent; captured media is attached only to the next message the user sends.
-- One-shot voice input plus user-started continuous dictation while the app is foregrounded; listening stops when the app is backgrounded. Spoken replies have rate/pitch controls and a stop control.
+- Camera capture, one-shot screenshot, and user-started continuous MediaProjection screen sampling after explicit OS consent.
+- One-shot voice input, foreground dictation, and a user-started microphone foreground service for wake phrases. The wake service has a persistent notification and explicit Stop action. Spoken replies have rate/pitch controls and a stop control.
 - Local chat history persisted on-device (latest 120 messages), with a clear-chat control.
 - Import user-selected TXT, Markdown, CSV, JSON, PDF, or DOCX documents into the next prompt. PDF import is limited to 20 MB and 30 pages; text context is capped at 120,000 characters. Scanned PDFs need OCR, which is not included.
 - Export chat transcripts as plain text.
 - Persist provider/model, custom assistant personality, and speech preferences; toggle spoken replies, adjust speech rate/pitch, and stop current speech.
 - Obsidian vault integration for durable Markdown memory, with query-keyword relevance retrieval.
 - Optional Android AccessibilityService for explicit, user-authorized app launching by unique app label, taps, double taps, repeated taps, long presses, swipes, and vertical scrolling. Drag is available as a confirmed AI action.
-- Original procedural OpenGL ES 3D companion with idle movement, blinking, and speech-synchronized mouth animation. Third-party PMX/MMD character import remains separate and license-gated.
+- Original procedural OpenGL ES 3D companion with idle movement, blinking, and speech-synchronized mouth animation. PMX/MMD ZIP packages can be imported into app-private storage with bounded safe extraction; the imported skeletal model is not yet rendered or rigged.
 - API credentials encrypted with Android Keystore and never committed to Git.
 
 ## Status
