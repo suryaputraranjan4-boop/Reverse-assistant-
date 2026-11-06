@@ -42,6 +42,7 @@ private class AvatarRenderer : Renderer {
     private val projection = FloatArray(16)
     private val view = FloatArray(16)
     private val model = FloatArray(16)
+    private val modelView = FloatArray(16)
     private val mvp = FloatArray(16)
     private var angle = 0f
     private var startedAt = System.nanoTime()
@@ -126,8 +127,8 @@ private class AvatarRenderer : Renderer {
         Matrix.rotateM(model, 0, angle, 0f, 1f, 0f)
         Matrix.translateM(model, 0, x, y, z)
         Matrix.scaleM(model, 0, sx, sy, sz)
-        Matrix.multiplyMM(mvp, 0, view, 0, model, 0)
-        Matrix.multiplyMM(mvp, 0, projection, 0, mvp, 0)
+        Matrix.multiplyMM(modelView, 0, view, 0, model, 0)
+        Matrix.multiplyMM(mvp, 0, projection, 0, modelView, 0)
         GLES20.glUniformMatrix4fv(modelHandle, 1, false, model, 0)
         GLES20.glUniformMatrix4fv(mvpHandle, 1, false, mvp, 0)
         GLES20.glUniform4f(colorHandle, red, green, blue, 1f)
