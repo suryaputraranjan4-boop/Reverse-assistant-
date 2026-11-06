@@ -24,7 +24,7 @@ The following are **not complete**:
 - Live video streaming of the Android screen to an AI provider. Screen sampling currently attaches the latest approved frame to the next user-sent message.
 - A dedicated offline wake-word engine. Wake phrases use Android's speech recognition service and may depend on its configured provider/network.
 - External MCP/plugin-server connections. The plugin registry currently toggles built-in app capabilities only.
-- Offline LLM runtime and model management.
+- Offline GGUF LLM runtime using the llama.cpp Android native binding. Users must import a compatible model; model weights are not bundled.
 - OCR scripts beyond Latin and Devanagari, handwriting recognition, and exact document layout reconstruction.
 - Full provider compatibility testing and physical-device validation.
 

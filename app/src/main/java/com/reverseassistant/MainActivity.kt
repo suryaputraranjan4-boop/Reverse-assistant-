@@ -40,6 +40,8 @@ import androidx.compose.ui.viewinterop.AndroidView
 import com.reverseassistant.ai.AiClient
 import com.reverseassistant.ai.AiProvider
 import com.reverseassistant.mcp.McpServerDialog
+import com.reverseassistant.local.OfflineLlmManager
+import com.reverseassistant.local.OfflineModelStore
 import com.reverseassistant.memory.ObsidianVault
 import com.reverseassistant.mcp.McpServerClient
 import com.reverseassistant.mcp.McpServerConfig
@@ -267,6 +269,7 @@ class MainActivity : ComponentActivity() {
         var prompt by remember { mutableStateOf("") }
         var apiKey by remember { mutableStateOf("") }
         var customEndpoint by remember { mutableStateOf(settingsPrefs.getString("custom_provider_endpoint", "") ?: "") }
+        var offlineModelPath by remember { mutableStateOf(settingsPrefs.getString("offline_model_path", "") ?: "") }
         var showSettings by remember { mutableStateOf(false) }
         var showPlugins by remember { mutableStateOf(false) }
         var showMcpServers by remember { mutableStateOf(false) }
@@ -294,9 +297,10 @@ class MainActivity : ComponentActivity() {
                 WakeWordService.onStopped = null
             }
         }
-        LaunchedEffect(provider, model, speakReplies, speechRate, speechPitch, assistantPersona, customEndpoint) {
+        LaunchedEffect(provider, model, speakReplies, speechRate, speechPitch, assistantPersona, customEndpoint, offlineModelPath) {
             settingsPrefs.edit().putString("provider", provider.name).putString("model", model)
                 .putString("custom_provider_endpoint", customEndpoint)
+                .putString("offline_model_path", offlineModelPath)
                 .putBoolean("speak_replies", speakReplies).putString("assistant_persona", assistantPersona)
                 .putFloat("speech_rate", speechRate)
                 .putFloat("speech_pitch", speechPitch).apply()
@@ -406,6 +410,39 @@ class MainActivity : ComponentActivity() {
                             "Document text attached (up to 120,000 characters). It is sent only when you press Send."
                         }
                     } catch (e: Exception) { status = e.message ?: "Could not read document." }
+                }
+            }
+        }
+        val offlineModelPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            if (uri != null) {
+                scope.launch {
+                    busy = true
+                    status = "Importing GGUF model into app storage…"
+                    try {
+                        val file = withContext(Dispatchers.IO) { OfflineModelStore.import(this@MainActivity, uri) }
+                        offlineModelPath = file.absolutePath
+                        provider = AiProvider.LOCAL_LLAMA
+                        model = file.name
+                        status = "GGUF imported. Loading the local model…"
+                    } catch (e: Exception) {
+                        status = e.message ?: "Could not import this GGUF model."
+                    } finally { busy = false }
+                }
+            }
+        }
+        LaunchedEffect(provider, offlineModelPath) {
+            if (provider == AiProvider.LOCAL_LLAMA) {
+                if (offlineModelPath.isBlank() || !java.io.File(offlineModelPath).isFile) {
+                    status = "Import a GGUF model to use the on-device LLM."
+                } else if (!OfflineLlmManager.isReady() || OfflineLlmManager.loadedModelPath() != offlineModelPath) {
+                    busy = true
+                    status = "Loading local GGUF model. This may take a while…"
+                    try {
+                        OfflineLlmManager.load(this@MainActivity, offlineModelPath)
+                        status = "Offline model loaded. No cloud API key is used."
+                    } catch (e: Exception) {
+                        status = e.message ?: "Offline model could not be loaded."
+                    } finally { busy = false }
                 }
             }
         }
@@ -692,6 +729,9 @@ class MainActivity : ComponentActivity() {
                             }
                             try { voice.launch(intent) } catch (_: Exception) { status = "No speech recognition app is available." }
                         }) { Icon(Icons.Default.Mic, "Voice input", tint = Color.White) }
+                        TextButton(enabled = !busy, onClick = {
+                            offlineModelPicker.launch(arrayOf("*/*"))
+                        }) { Text(if (offlineModelPath.isBlank()) "IMPORT GGUF" else "CHANGE GGUF") }
                         TextButton(enabled = PluginRegistry.isEnabled(this@MainActivity, "obsidian"), onClick = {
                             if (lastReply.isBlank()) status = "Ask something first."
                             else try { ObsidianVault.appendMemory(this@MainActivity, "Conversation note", lastReply); status = "Saved to Obsidian." }
@@ -972,8 +1012,13 @@ class MainActivity : ComponentActivity() {
                 onDismissRequest = { showSettings = false },
                 title = { Text("${provider.label} API key") },
                 text = { Column {
-                    OutlinedTextField(value = draft, onValueChange = { draft = it }, label = { Text("API key") }, singleLine = true)
-                    Text("Stored encrypted with Android Keystore. Never commit API keys.", style = MaterialTheme.typography.bodySmall)
+                    if (provider == AiProvider.LOCAL_LLAMA) {
+                        Text("On-device llama.cpp inference. Import a GGUF model from Quick Tools; no API key or network request is used.")
+                        Text(if (offlineModelPath.isBlank()) "No GGUF model imported." else "Model file: " + java.io.File(offlineModelPath).name)
+                    } else {
+                        OutlinedTextField(value = draft, onValueChange = { draft = it }, label = { Text("API key") }, singleLine = true)
+                        Text("Stored encrypted with Android Keystore. Never commit API keys.", style = MaterialTheme.typography.bodySmall)
+                    }
                     if (provider == AiProvider.CUSTOM_OPENAI_COMPATIBLE) {
                         OutlinedTextField(value = endpointDraft, onValueChange = { endpointDraft = it.take(500) },
                             label = { Text("HTTPS chat-completions endpoint") }, singleLine = true)
@@ -990,7 +1035,7 @@ class MainActivity : ComponentActivity() {
                     Slider(value = speechPitch, onValueChange = { speechPitch = it }, valueRange = 0.7f..1.4f)
                 } },
                 confirmButton = { TextButton(onClick = {
-                    SecretStore.put(this@MainActivity, provider.secretName, draft)
+                    if (provider != AiProvider.LOCAL_LLAMA) SecretStore.put(this@MainActivity, provider.secretName, draft)
                     if (provider == AiProvider.CUSTOM_OPENAI_COMPATIBLE) customEndpoint = endpointDraft.trim()
                     assistantPersona = personaDraft
                     apiKey = draft; showSettings = false; status = "Settings saved on this device."

@@ -3,6 +3,8 @@ package com.reverseassistant.ai
 import android.util.Base64
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.collect
+import com.reverseassistant.local.OfflineLlmManager
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -26,8 +28,13 @@ class AiClient {
         image: ByteArray? = null,
         customEndpoint: String? = null
     ): String = withContext(Dispatchers.IO) {
-        require(apiKey.isNotBlank()) { "Add an API key for ${provider.label} in Settings." }
         require(prompt.isNotBlank()) { "Write a message first." }
+        if (provider == AiProvider.LOCAL_LLAMA) {
+            val local = StringBuilder()
+            OfflineLlmManager.generate(prompt).collect { local.append(it) }
+            return@withContext local.toString().ifBlank { "The offline model returned an empty response." }
+        }
+        require(apiKey.isNotBlank()) { "Add an API key for ${provider.label} in Settings." }
         val image64 = image?.let { Base64.encodeToString(it, Base64.NO_WRAP) }
         val request = when (provider) {
             AiProvider.GEMINI -> gemini(model, apiKey, prompt, image64)
@@ -70,8 +77,16 @@ class AiClient {
         customEndpoint: String? = null,
         onDelta: (String) -> Unit
     ): String = withContext(Dispatchers.IO) {
-        require(apiKey.isNotBlank()) { "Add an API key for ${provider.label} in Settings." }
         require(prompt.isNotBlank()) { "Write a message first." }
+        if (provider == AiProvider.LOCAL_LLAMA) {
+            val local = StringBuilder()
+            OfflineLlmManager.generate(prompt).collect { delta ->
+                local.append(delta)
+                withContext(Dispatchers.Main) { onDelta(delta) }
+            }
+            return@withContext local.toString().ifBlank { "The offline model returned an empty response." }
+        }
+        require(apiKey.isNotBlank()) { "Add an API key for ${provider.label} in Settings." }
         val image64 = image?.let { Base64.encodeToString(it, Base64.NO_WRAP) }
         val request = when (provider) {
             AiProvider.GEMINI -> gemini(model, apiKey, prompt, image64, true)

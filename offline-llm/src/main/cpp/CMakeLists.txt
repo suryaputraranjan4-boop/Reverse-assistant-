@@ -9,6 +9,13 @@ if(NOT EXISTS "${LLAMA_SRC}/CMakeLists.txt")
     message(FATAL_ERROR "llama.cpp submodule is missing. Initialize git submodules before building.")
 endif()
 
+if(ANDROID_ABI STREQUAL "arm64-v8a")
+    set(GGML_SYSTEM_ARCH "ARM")
+    set(GGML_CPU_KLEIDIAI ON)
+else()
+    message(FATAL_ERROR "Offline LLM currently supports arm64-v8a only.")
+endif()
+
 set(LLAMA_BUILD_COMMON ON CACHE BOOL "" FORCE)
 set(LLAMA_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(LLAMA_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
@@ -27,5 +34,10 @@ target_include_directories(ai-chat PRIVATE
     "${LLAMA_SRC}/include"
     "${LLAMA_SRC}/ggml/include"
     "${LLAMA_SRC}/ggml/src"
+)
+target_compile_definitions(ai-chat PRIVATE
+    GGML_SYSTEM_ARCH=${GGML_SYSTEM_ARCH}
+    GGML_CPU_KLEIDIAI=$<BOOL:${GGML_CPU_KLEIDIAI}>
+    GGML_OPENMP=0
 )
 target_link_libraries(ai-chat PRIVATE llama llama-common android log)
