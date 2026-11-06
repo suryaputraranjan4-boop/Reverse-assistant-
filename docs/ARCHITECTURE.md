@@ -26,7 +26,7 @@
 
 - Imported PMX/MMD rendering, skeletal rigging, animation retargeting, and imported-model lip sync.
 - Direct live screen-video streaming to an AI provider.
-- Dedicated offline wake-word detection and offline LLM runtime/model management.
+- Optional Vosk offline wake-phrase recognition with a user-imported model; Android SpeechRecognizer remains the fallback when no offline model is installed.
 - OCR scripts beyond Latin and Devanagari, handwriting recognition, and exact document layout reconstruction.
 - External MCP/plugin server adapters and user-configurable third-party connectors.
 - Broad provider compatibility and physical-device testing.

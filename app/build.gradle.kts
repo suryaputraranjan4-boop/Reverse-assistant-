@@ -46,6 +46,8 @@ dependencies {
     implementation("com.google.mlkit:text-recognition:16.0.1")
     implementation("com.google.mlkit:text-recognition-devanagari:16.0.1")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("net.java.dev.jna:jna:5.18.1@aar")
+    implementation("com.alphacephei:vosk-android:0.3.75@aar")
     implementation("org.jsoup:jsoup:1.18.3")
     implementation(project(":offline-llm"))
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.1")

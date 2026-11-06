@@ -39,9 +39,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.reverseassistant.ai.AiClient
 import com.reverseassistant.ai.AiProvider
-import com.reverseassistant.mcp.McpServerDialog
 import com.reverseassistant.local.OfflineLlmManager
 import com.reverseassistant.local.OfflineModelStore
+import com.reverseassistant.local.OfflineWakeModelStore
 import com.reverseassistant.memory.ObsidianVault
 import com.reverseassistant.mcp.McpServerClient
 import com.reverseassistant.mcp.McpServerConfig
@@ -250,6 +250,8 @@ class MainActivity : ComponentActivity() {
     private fun ReverseAssistantApp() {
         val scope = rememberCoroutineScope()
         val settingsPrefs = remember { getSharedPreferences("reverse_assistant_settings", MODE_PRIVATE) }
+        val voicePrefs = remember { getSharedPreferences("reverse_assistant_voice", MODE_PRIVATE) }
+        var offlineWakeModelPath by remember { mutableStateOf(voicePrefs.getString("vosk_model_path", "") ?: "") }
         var provider by remember {
             mutableStateOf(AiProvider.values().firstOrNull { it.name == settingsPrefs.getString("provider", "GEMINI") } ?: AiProvider.GEMINI)
         }
@@ -291,10 +293,15 @@ class MainActivity : ComponentActivity() {
                 status = "Wake phrase detected. Review the command, then press Send."
             }
             WakeWordService.onStopped = { wakeWordActive = false }
+            WakeWordService.onStatus = { message -> status = message }
             onDispose {
                 WakeWordService.onCommand = null
                 WakeWordService.onStopped = null
+                WakeWordService.onStatus = null
             }
+        }
+        LaunchedEffect(offlineWakeModelPath) {
+            voicePrefs.edit().putString("vosk_model_path", offlineWakeModelPath).apply()
         }
         LaunchedEffect(provider, model, speakReplies, speechRate, speechPitch, assistantPersona, customEndpoint, offlineModelPath) {
             settingsPrefs.edit().putString("provider", provider.name).putString("model", model)
@@ -425,6 +432,27 @@ class MainActivity : ComponentActivity() {
                         status = "GGUF imported. Loading the local model…"
                     } catch (e: Exception) {
                         status = e.message ?: "Could not import this GGUF model."
+                    } finally { busy = false }
+                }
+            }
+        }
+        val offlineWakeModelPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            if (uri != null) {
+                scope.launch {
+                    busy = true
+                    status = "Importing offline Vosk wake model…"
+                    try {
+                        val folder = withContext(Dispatchers.IO) {
+                            OfflineWakeModelStore.import(this@MainActivity, uri)
+                        }
+                        offlineWakeModelPath = folder.absolutePath
+                        if (WakeWordService.active) {
+                            startService(Intent(this@MainActivity, WakeWordService::class.java).setAction(WakeWordService.ACTION_STOP))
+                            wakeWordActive = false
+                        }
+                        status = "Offline wake model imported. Start Wake Word to use it."
+                    } catch (error: Exception) {
+                        status = error.message ?: "Could not import this Vosk model."
                     } finally { busy = false }
                 }
             }
@@ -690,6 +718,7 @@ class MainActivity : ComponentActivity() {
                             }
                         }) { Text(if (continuousScreen) "STOP LIVE SCREEN" else "LIVE SCREEN") }
                         TextButton(onClick = { modelPicker.launch(arrayOf("application/zip", "application/x-zip-compressed", "application/octet-stream")) }) { Text("IMPORT 3D MODEL") }
+                        TextButton(enabled = !busy, onClick = { offlineWakeModelPicker.launch(arrayOf("application/zip", "application/x-zip-compressed", "application/octet-stream")) }) { Text(if (offlineWakeModelPath.isBlank()) "IMPORT OFFLINE WAKE" else "CHANGE OFFLINE WAKE") }
                         TextButton(onClick = { documentPicker.launch(arrayOf("text/plain", "text/markdown", "text/csv", "application/json", "application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")) }) { Text("FILE") }
                         TextButton(onClick = { exportChat.launch("reverse-assistant-chat.txt") }) { Text("EXPORT CHAT") }
                         TextButton(onClick = { backupExport.launch("reverse-assistant-backup.json") }) { Text("BACKUP") }
@@ -997,10 +1026,6 @@ class MainActivity : ComponentActivity() {
                 },
                 dismissButton = { TextButton(onClick = { showMcpServers = false }) { Text("DONE") } }
             )
-        }
-
-        if (showMcpServers) {
-            McpServerDialog(context = this@MainActivity, onDismiss = { showMcpServers = false })
         }
 
         if (showSettings) {
