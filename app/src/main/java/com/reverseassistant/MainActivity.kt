@@ -163,22 +163,32 @@ class MainActivity : ComponentActivity() {
                                     }
                                     val memorySection = if (savedMemory.isBlank()) "" else
                                         "Relevant user-approved Obsidian memory (use only when relevant):\n$savedMemory\n\n"
-                                    val screenContext = TouchControlService.active?.screenContext()
-                                        ?: "Touch service is not enabled; do not propose phone gestures."
-                                    val actionGuide = """
-                                        If the user explicitly asks you to operate the phone and screen context is available,
-                                        return exactly one JSON object and no other text:
+                                    // Screen contents are private. Do not inspect or send them to a cloud
+                                    // provider unless the user explicitly asks for phone-control help.
+                                    val requestsPhoneControl = isExplicitPhoneControlRequest(text)
+                                    val screenContext = if (requestsPhoneControl) {
+                                        TouchControlService.active?.screenContext()
+                                            ?: "Touch service is not enabled; no screen context is available."
+                                    } else {
+                                        "Not accessed: the user did not request phone control."
+                                    }
+                                    val actionGuide = if (requestsPhoneControl) """
+                                        The user explicitly requested phone control. If one safe, clear action is
+                                        appropriate, return exactly one JSON object and no other text:
                                         {"phone_action":{"type":"tap_text","target":"visible label"}}
                                         Allowed types: tap_text, tap, double_tap, long_press, repeat_tap, swipe, scroll_up, scroll_down.
                                         Coordinate fields x,y,x2,y2 must be normalized from 0.0 to 1.0.
                                         For repeat_tap use count 1..10. For long_press/swipe use duration_ms.
-                                        Never propose an action for a request that is not asking for phone control.
-                                        The app will show the proposal and wait for the user's explicit confirmation.
+                                        Do not guess targets or perform sensitive actions. If uncertain, ask a question
+                                        in normal text instead. The app requires the user to review and confirm the action.
+                                    """.trimIndent() else """
+                                        Phone control was not requested. Do not return phone_action JSON or suggest
+                                        operating the device. Answer normally without accessing screen contents.
                                     """.trimIndent()
                                     val contextPrompt = memorySection + actionGuide +
-                                        "\n\nVisible Android screen context:\n$screenContext\n\nRecent conversation:\n$recentChat\n\nRespond to the latest user message."
+                                        "\n\nVisible Android screen context (only if explicitly requested):\n$screenContext\n\nRecent conversation:\n$recentChat\n\nRespond to the latest user message."
                                     val reply = AiClient().ask(provider, model, key, contextPrompt, photo)
-                                    val proposedAction = PhoneAction.parse(reply)
+                                    val proposedAction = if (requestsPhoneControl) PhoneAction.parse(reply) else null
                                     if (proposedAction != null) {
                                         pendingAction = proposedAction
                                         messages.add(ChatMessage("I prepared a phone action. Review the confirmation card below before it runs.", false))
