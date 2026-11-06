@@ -349,6 +349,57 @@ class MainActivity : ComponentActivity() {
                 } catch (e: Exception) { status = e.message ?: "Could not export chat." }
             }
         }
+        val backupExport = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+            if (uri != null) {
+                try {
+                    val backup = BackupManager.create(this@MainActivity, messages.toList())
+                    contentResolver.openOutputStream(uri)?.use { it.write(backup.toByteArray(Charsets.UTF_8)) }
+                    status = "Backup exported. API keys and Android permissions were intentionally excluded."
+                } catch (e: Exception) { status = e.message ?: "Could not export backup." }
+            }
+        }
+        val backupImport = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            if (uri != null) {
+                try {
+                    val raw = contentResolver.openInputStream(uri)?.use { input ->
+                        val output = ByteArrayOutputStream()
+                        val buffer = ByteArray(8192)
+                        var total = 0
+                        while (true) {
+                            val count = input.read(buffer)
+                            if (count < 0) break
+                            total += count
+                            require(total <= 2_000_000) { "Backup file is too large." }
+                            output.write(buffer, 0, count)
+                        }
+                        output.toString("UTF-8")
+                    } ?: error("Could not open backup file.")
+                    val backup = BackupManager.parse(raw)
+                    messages.clear()
+                    messages.addAll(backup.messages)
+                    provider = AiProvider.values().first { it.name == backup.provider }
+                    model = backup.model.ifBlank { provider.defaultModel }
+                    speakReplies = backup.speakReplies
+                    assistantPersona = backup.persona
+                    speechRate = backup.speechRate
+                    speechPitch = backup.speechPitch
+                    apiKey = SecretStore.get(this@MainActivity, provider.secretName)
+                    pendingAction = null
+                    lastReply = ""
+                    status = "Backup restored. API keys and Android permissions were not changed."
+                } catch (e: Exception) { status = e.message ?: "Could not restore backup." }
+            }
+        }
+        val diagnosticsExport = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
+            if (uri != null) {
+                try {
+                    contentResolver.openOutputStream(uri)?.use {
+                        it.write(DiagnosticsReport.create(this@MainActivity).toByteArray(Charsets.UTF_8))
+                    }
+                    status = "Privacy-safe diagnostics report exported. No API keys are included."
+                } catch (e: Exception) { status = e.message ?: "Could not export diagnostics." }
+            }
+        }
         val vaultPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
             if (uri != null) {
                 try { ObsidianVault.saveTree(this@MainActivity, uri); status = "Obsidian vault connected." }
@@ -414,7 +465,10 @@ class MainActivity : ComponentActivity() {
                             screenCapture.launch(manager.createScreenCaptureIntent())
                         }) { Text("SCREEN") }
                         TextButton(onClick = { documentPicker.launch(arrayOf("text/plain", "text/markdown", "text/csv", "application/json", "application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")) }) { Text("FILE") }
-                        TextButton(onClick = { exportChat.launch("reverse-assistant-chat.txt") }) { Text("EXPORT") }
+                        TextButton(onClick = { exportChat.launch("reverse-assistant-chat.txt") }) { Text("EXPORT CHAT") }
+                        TextButton(onClick = { backupExport.launch("reverse-assistant-backup.json") }) { Text("BACKUP") }
+                        TextButton(onClick = { backupImport.launch(arrayOf("application/json", "text/json")) }) { Text("RESTORE") }
+                        TextButton(onClick = { diagnosticsExport.launch("reverse-assistant-diagnostics.txt") }) { Text("DIAGNOSTICS") }
                         TextButton(onClick = {
                             if (liveListening) {
                                 val wasListening = liveListening
