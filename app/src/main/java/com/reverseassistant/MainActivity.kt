@@ -10,6 +10,7 @@ import android.speech.RecognitionListener
 import android.os.Handler
 import android.os.Looper
 import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
 import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -32,6 +33,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import com.reverseassistant.ai.AiClient
 import com.reverseassistant.ai.AiProvider
 import com.reverseassistant.memory.ObsidianVault
@@ -94,6 +96,7 @@ private fun isExplicitPhoneControlRequest(message: String): Boolean {
 
 class MainActivity : ComponentActivity() {
     private var tts: TextToSpeech? = null
+    private var avatarSpeakingCallback: ((Boolean) -> Unit)? = null
     private var speechRecognizer: SpeechRecognizer? = null
     private var continuousListening = false
     private var speechTextCallback: ((String) -> Unit)? = null
@@ -198,7 +201,22 @@ class MainActivity : ComponentActivity() {
     }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        tts = TextToSpeech(this) { status -> if (status == TextToSpeech.SUCCESS) tts?.language = Locale.getDefault() }
+        tts = TextToSpeech(this) { status ->
+            if (status == TextToSpeech.SUCCESS) {
+                tts?.language = Locale.getDefault()
+                tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+                    override fun onStart(utteranceId: String?) {
+                        runOnUiThread { avatarSpeakingCallback?.invoke(true) }
+                    }
+                    override fun onDone(utteranceId: String?) {
+                        runOnUiThread { avatarSpeakingCallback?.invoke(false) }
+                    }
+                    override fun onError(utteranceId: String?) {
+                        runOnUiThread { avatarSpeakingCallback?.invoke(false) }
+                    }
+                })
+            }
+        }
         setContent { ReverseAssistantApp() }
     }
     override fun onDestroy() { tts?.shutdown(); super.onDestroy() }
@@ -214,6 +232,7 @@ class MainActivity : ComponentActivity() {
         var model by remember { mutableStateOf(settingsPrefs.getString("model", null) ?: provider.defaultModel) }
         var speakReplies by remember { mutableStateOf(settingsPrefs.getBoolean("speak_replies", true)) }
         var liveListening by remember { mutableStateOf(false) }
+        var avatarSpeaking by remember { mutableStateOf(false) }
         var speechRate by remember { mutableFloatStateOf(settingsPrefs.getFloat("speech_rate", 1.0f).coerceIn(0.6f, 1.5f)) }
         var speechPitch by remember { mutableFloatStateOf(settingsPrefs.getFloat("speech_pitch", 1.0f).coerceIn(0.7f, 1.4f)) }
         var attachedDocument by remember { mutableStateOf("") }
@@ -226,6 +245,10 @@ class MainActivity : ComponentActivity() {
         var status by remember { mutableStateOf("Choose an AI provider and add its API key in Settings.") }
         var busy by remember { mutableStateOf(false) }
         var lastReply by remember { mutableStateOf("") }
+        DisposableEffect(Unit) {
+            avatarSpeakingCallback = { speaking -> avatarSpeaking = speaking }
+            onDispose { avatarSpeakingCallback = null }
+        }
         LaunchedEffect(provider, model, speakReplies, speechRate, speechPitch) {
             settingsPrefs.edit().putString("provider", provider.name).putString("model", model)
                 .putBoolean("speak_replies", speakReplies).putFloat("speech_rate", speechRate)
@@ -361,10 +384,12 @@ class MainActivity : ComponentActivity() {
                         OutlinedTextField(value = model, onValueChange = { model = it }, label = { Text("Model ID") }, singleLine = true, modifier = Modifier.weight(1f))
                     }
                     Spacer(Modifier.height(8.dp))
-                    Text("3D AVATAR", color = Color(0xFFB7A1FF), style = MaterialTheme.typography.labelMedium)
-                    Box(Modifier.fillMaxWidth().height(88.dp).background(Color(0xFF1B1B28), RoundedCornerShape(18.dp)), contentAlignment = Alignment.Center) {
-                        Text("Avatar renderer module — model import pending", color = Color.LightGray)
-                    }
+                    Text("3D COMPANION", color = Color(0xFFB7A1FF), style = MaterialTheme.typography.labelMedium)
+                    AndroidView(
+                        factory = { context -> Avatar3DView(context) },
+                        update = { view -> view.setSpeaking(avatarSpeaking) },
+                        modifier = Modifier.fillMaxWidth().height(180.dp).background(Color(0xFF1B1B28), RoundedCornerShape(18.dp))
+                    )
                     Spacer(Modifier.height(8.dp))
                     LazyColumn(Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         items(messages) { msg ->
@@ -394,6 +419,7 @@ class MainActivity : ComponentActivity() {
                                 status = if (wasListening) "Live microphone stopped." else "Speech stopped."
                             }
                             tts?.stop()
+                            avatarSpeaking = false
                         }) { Icon(Icons.Default.Stop, "Stop speech and microphone") }
                         TextButton(onClick = {
                             if (liveListening) {
