@@ -50,11 +50,11 @@ class AiClient {
                         (0 until parts.length()).mapNotNull { parts.optJSONObject(it)?.optString("text") }
                             .joinToString("\n").trim()
                     }.orEmpty()
-                else -> json.optJSONArray("choices")?.optJSONObject(0)?.optJSONObject("message")?.optString("content").orEmpty()
                 AiProvider.CLAUDE -> json.optJSONArray("content")?.let { blocks ->
                     (0 until blocks.length()).mapNotNull { blocks.optJSONObject(it)?.takeIf { b -> b.optString("type") == "text" }?.optString("text") }
                         .joinToString("\n").trim()
                 }.orEmpty()
+                else -> json.optJSONArray("choices")?.optJSONObject(0)?.optJSONObject("message")?.optString("content").orEmpty()
             }.ifBlank { "The provider returned an empty response." }
         }
     }
@@ -102,6 +102,7 @@ class AiClient {
                                 (0 until parts.length()).mapNotNull { parts.optJSONObject(it)?.optString("text") }
                                     .joinToString("")
                             }.orEmpty()
+                        AiProvider.CLAUDE -> event.optJSONObject("delta")?.optString("text").orEmpty()
                         else -> {
                             val content = event.optJSONArray("choices")?.optJSONObject(0)
                                 ?.optJSONObject("delta")?.opt("content")
@@ -113,7 +114,6 @@ class AiClient {
                                 else -> ""
                             }
                         }
-                        AiProvider.CLAUDE -> event.optJSONObject("delta")?.optString("text").orEmpty()
                     }
                 } catch (_: Exception) { "" }
                 if (delta.isNotEmpty()) {
