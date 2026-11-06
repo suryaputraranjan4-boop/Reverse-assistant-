@@ -9,7 +9,7 @@ Android-first personal AI assistant. This repository is the clean implementation
 - Camera capture and one-shot Android MediaProjection screenshot capture after explicit OS consent; captured media is attached only to the next message the user sends.
 - One-shot voice input plus user-started continuous dictation while the app is foregrounded; listening stops when the app is backgrounded. Spoken replies have rate/pitch controls and a stop control.
 - Local chat history persisted on-device (latest 120 messages), with a clear-chat control.
-- Import user-selected TXT, Markdown, CSV, or JSON text documents (bounded to 120 KB) into the next prompt; the UI discloses that the attached text is sent to the selected AI provider.
+- Import user-selected TXT, Markdown, CSV, JSON, PDF, or DOCX documents into the next prompt. PDF import is limited to 20 MB and 30 pages; text context is capped at 120,000 characters. Scanned PDFs need OCR, which is not included.
 - Export chat transcripts as plain text.
 - Persist provider/model and speech preferences; toggle spoken replies, adjust speech rate/pitch, and stop current speech.
 - Obsidian vault integration for durable Markdown memory, with query-keyword relevance retrieval.
@@ -19,9 +19,9 @@ Android-first personal AI assistant. This repository is the clean implementation
 
 ## Status
 
-Chat history persistence and the AI drag action have now been added. Implemented in this branch: streaming text responses for Gemini/OpenAI/Claude/OpenRouter, foreground continuous dictation (no wake word), one-shot OS-consented screen capture, user-selected TXT/Markdown/CSV/JSON import, chat export, speech controls, and keyword-ranked Obsidian memory retrieval. Still pending: importing the user-supplied PMX/MMD character model and a full skeletal rig, continuous live screen streaming, multi-step device orchestration, PDF/DOCX extraction, integrated web search, plugin integrations, robust provider compatibility tests, and real-device validation.
+Chat history persistence and the AI drag action have now been added. Implemented in this branch: streaming text responses for Gemini/OpenAI/Claude/OpenRouter, foreground continuous dictation (no wake word), one-shot OS-consented screen capture, user-selected TXT/Markdown/CSV/JSON import, chat export, speech controls, and keyword-ranked Obsidian memory retrieval. Still pending: importing the user-supplied PMX/MMD character model and a full skeletal rig, continuous live screen streaming, multi-step device orchestration, scanned-PDF OCR, integrated web search, plugin integrations, robust provider compatibility tests, and real-device validation.
 
-The Android project currently builds successfully in GitHub Actions and uploads a debug APK artifact (workflow run 42193647302). This is a verified CI build, not proof of production readiness or physical-device compatibility. Provider calls require the user's own API keys and may incur provider charges. Physical-device testing and several advanced modules are still pending.
+The latest feature batch is awaiting its GitHub Actions build. The earlier successful CI run (42193647302) predates these changes and is not evidence that the current branch builds. A successful CI build is not proof of physical-device compatibility. Provider calls require the user's own API keys and may incur provider charges. Physical-device testing and several advanced modules are still pending.
 
 ## Build
 
