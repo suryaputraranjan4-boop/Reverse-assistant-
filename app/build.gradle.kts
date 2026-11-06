@@ -49,6 +49,7 @@ dependencies {
     implementation("net.java.dev.jna:jna:5.18.1@aar")
     implementation("com.alphacephei:vosk-android:0.3.75@aar")
     implementation("org.jsoup:jsoup:1.18.3")
+    implementation("androidx.webkit:webkit:1.12.1")
     implementation(project(":offline-llm"))
     implementation(project(":model-runtime"))
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.1")

@@ -17,3 +17,10 @@
 - Artifact: `com.alphacephei:vosk-android:0.3.75`
 - License: Apache License 2.0 (upstream Vosk API project).
 - The app does not bundle acoustic model weights; the user imports a compatible model archive locally.
+
+
+## babylon-mmd
+- Project: https://github.com/noname0310/babylon-mmd
+- Version used by the WebView: 1.3.0 (loaded from unpkg CDN)
+- License: MIT. The viewer does not bundle the library; it loads the pinned UMD build at runtime.
+- The viewer also loads Babylon.js from the official Babylon CDN.

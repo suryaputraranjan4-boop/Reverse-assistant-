@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Reverse Assistant · MMD Viewer</title>
+<style>
+html,body,#renderCanvas{width:100%;height:100%;margin:0;overflow:hidden;background:#080b14}
+#status{position:absolute;left:12px;right:12px;top:12px;padding:10px 12px;border-radius:12px;background:rgba(12,18,32,.82);color:#e9edf8;font:13px system-ui;z-index:5}
+#hint{position:absolute;left:12px;right:12px;bottom:12px;color:#cbd5e1;text-align:center;font:12px system-ui;text-shadow:0 1px 4px #000;pointer-events:none}
+</style>
+<script src="https://cdn.babylonjs.com/babylon.js"></script>
+<script src="https://unpkg.com/babylon-mmd@1.3.0/umd/babylon.mmd.min.js"></script>
+</head>
+<body>
+<div id="status">Preparing MMD renderer…</div>
+<canvas id="renderCanvas"></canvas>
+<div id="hint">Drag to orbit · Pinch to zoom · Back to close</div>
+<script>
+(async function () {
+  const status = document.getElementById("status");
+  const say = (message) => { status.textContent = message; };
+  try {
+    if (!window.BABYLON || !window.BABYLONMMD) throw new Error("Babylon.js or babylon-mmd did not load. Check your internet connection.");
+    const query = new URLSearchParams(location.search);
+    const modelPath = query.get("model");
+    const motionPath = query.get("motion") || "";
+    if (!modelPath || modelPath.includes("..")) throw new Error("Invalid PMX model path.");
+    const modelUrl = new URL("/models/" + modelPath, location.origin).toString();
+    const canvas = document.getElementById("renderCanvas");
+    const engine = new BABYLON.Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true });
+    const scene = new BABYLON.Scene(engine);
+    scene.clearColor = new BABYLON.Color4(0.025, 0.035, 0.06, 1);
+    const camera = new BABYLON.ArcRotateCamera("mmd-camera", Math.PI / 2, Math.PI / 2.25, 18, BABYLON.Vector3.Zero(), scene);
+    camera.attachControl(canvas, true);
+    camera.wheelPrecision = 35;
+    camera.lowerRadiusLimit = 1;
+    new BABYLON.HemisphericLight("mmd-light", new BABYLON.Vector3(0, 1, 0), scene).intensity = 1.05;
+    BABYLONMMD.RegisterPmxLoader();
+    say("Loading PMX model and textures…");
+    const container = await BABYLON.SceneLoader.LoadAssetContainerAsync("", modelUrl, scene);
+    container.addAllToScene();
+    const rootMesh = container.meshes[0];
+    if (!rootMesh) throw new Error("The PMX file did not contain a renderable mesh.");
+    const runtime = new BABYLONMMD.MmdRuntime(scene);
+    runtime.register(scene);
+    const model = runtime.createMmdModel(rootMesh);
+    const bounds = rootMesh.getHierarchyBoundingVectors(true);
+    const center = bounds.min.add(bounds.max).scale(0.5);
+    const size = bounds.max.subtract(bounds.min).length();
+    camera.target = center;
+    camera.radius = Math.max(2.5, size * 1.4);
+    if (motionPath) {
+      try {
+        const motionUrl = new URL("/models/" + motionPath, location.origin).toString();
+        const vmdLoader = new BABYLONMMD.VmdLoader(scene);
+        const animation = await vmdLoader.loadAsync("imported-motion", motionUrl);
+        const handle = model.createRuntimeAnimation(animation);
+        model.setRuntimeAnimation(handle);
+        if (typeof runtime.playAnimation === "function") runtime.playAnimation();
+        say("PMX model loaded · VMD motion playing");
+      } catch (motionError) {
+        say("PMX model loaded. VMD motion could not be applied: " + motionError.message);
+      }
+    } else {
+      say("PMX model loaded · no VMD motion found in the package");
+    }
+    engine.runRenderLoop(() => scene.render());
+    window.addEventListener("resize", () => engine.resize());
+  } catch (error) {
+    say("MMD viewer: " + (error.message || String(error)));
+  }
+})();
+</script>
+</body>
+</html>

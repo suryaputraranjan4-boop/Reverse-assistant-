@@ -51,6 +51,7 @@ import com.reverseassistant.search.WebSearchClient
 import com.reverseassistant.touch.PhoneAction
 import com.reverseassistant.touch.TouchControlService
 import java.io.ByteArrayOutputStream
+import java.io.File
 import java.util.Locale
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
@@ -580,7 +581,15 @@ class MainActivity : ComponentActivity() {
                         } ?: error("The PMX file was extracted, but Assimp could not create a renderable triangle mesh.")
                         importedMeshData = mesh
                         importedModelStatus = imported.summary
-                        status = "PMX mesh loaded into the 3D preview. Bone animation, VMD motion, physics, and texture maps are still pending."
+                        val storageRoot = File(filesDir, "imported-models")
+                        val modelPath = File(imported.firstPmxPath).relativeTo(storageRoot).invariantSeparatorsPath
+                        val packageRoot = File(storageRoot, imported.folderName)
+                        val vmdFile = packageRoot.walkTopDown().firstOrNull { it.isFile && it.extension.equals("vmd", true) }
+                        val motionPath = vmdFile?.relativeTo(storageRoot)?.invariantSeparatorsPath.orEmpty()
+                        startActivity(Intent(this@MainActivity, MmdViewerActivity::class.java)
+                            .putExtra(MmdViewerActivity.EXTRA_MODEL_PATH, modelPath)
+                            .putExtra(MmdViewerActivity.EXTRA_MOTION_PATH, motionPath))
+                        status = "PMX mesh loaded in the companion preview. Opening the full MMD viewer for textures and VMD motion."
                     } catch (e: Exception) {
                         status = e.message ?: "Could not import the model package."
                     }
