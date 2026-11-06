@@ -42,11 +42,16 @@ class GeminiLiveVideoSession(
 
     fun start() {
         check(!closed) { "Live session has already been closed." }
-        socket = client.newWebSocket(Request.Builder().url(socketUrl).build(), object : WebSocketListener() {
+        socket = client.newWebSocket(
+            Request.Builder().url(socketUrl.toString().replaceFirst("https://", "wss://")).build(),
+            object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
                 val setup = JSONObject().put("setup", JSONObject()
                     .put("model", "models/$model")
                     .put("generationConfig", JSONObject().put("responseModalities", JSONArray().put("TEXT")))
+                    .put("systemInstruction", JSONObject().put("parts", JSONArray().put(JSONObject().put(
+                        "text", "You are observing a user-consented Android screen feed. Use incoming frames as visual context. Answer only when the user sends a text prompt; do not assume or describe private content unnecessarily."
+                    ))))
                 )
                 if (!webSocket.send(setup.toString())) fail("Could not send Gemini Live setup.")
             }
