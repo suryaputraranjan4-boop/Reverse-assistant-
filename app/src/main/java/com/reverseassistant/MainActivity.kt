@@ -148,8 +148,8 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 })
-                startSpeechRecognition()
             }
+            startSpeechRecognition()
         } catch (e: Exception) {
             onStatus(e.message ?: "Could not start live microphone.")
             stopContinuousListening()
