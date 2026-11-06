@@ -28,6 +28,8 @@ import com.reverseassistant.ai.AiClient
 import com.reverseassistant.ai.AiProvider
 import com.reverseassistant.memory.ObsidianVault
 import com.reverseassistant.security.SecretStore
+import com.reverseassistant.touch.PhoneAction
+import com.reverseassistant.touch.TouchControlService
 import java.io.ByteArrayOutputStream
 import java.util.Locale
 import kotlinx.coroutines.launch
@@ -57,6 +59,7 @@ class MainActivity : ComponentActivity() {
         var status by remember { mutableStateOf("Choose an AI provider and add its API key in Settings.") }
         var busy by remember { mutableStateOf(false) }
         var lastReply by remember { mutableStateOf("") }
+        var pendingAction by remember { mutableStateOf<PhoneAction?>(null) }
         val messages = remember { mutableStateListOf<ChatMessage>() }
 
         val camera = rememberLauncherForActivityResult(ActivityResultContracts.TakePicturePreview()) { bitmap ->
@@ -160,19 +163,61 @@ class MainActivity : ComponentActivity() {
                                     }
                                     val memorySection = if (savedMemory.isBlank()) "" else
                                         "Relevant user-approved Obsidian memory (use only when relevant):\n$savedMemory\n\n"
-                                    val contextPrompt = memorySection +
-                                        "Recent conversation for context:\n$recentChat\n\nRespond to the latest user message."
+                                    val screenContext = TouchControlService.active?.screenContext()
+                                        ?: "Touch service is not enabled; do not propose phone gestures."
+                                    val actionGuide = """
+                                        If the user explicitly asks you to operate the phone and screen context is available,
+                                        return exactly one JSON object and no other text:
+                                        {"phone_action":{"type":"tap_text","target":"visible label"}}
+                                        Allowed types: tap_text, tap, double_tap, long_press, repeat_tap, swipe, scroll_up, scroll_down.
+                                        Coordinate fields x,y,x2,y2 must be normalized from 0.0 to 1.0.
+                                        For repeat_tap use count 1..10. For long_press/swipe use duration_ms.
+                                        Never propose an action for a request that is not asking for phone control.
+                                        The app will show the proposal and wait for the user's explicit confirmation.
+                                    """.trimIndent()
+                                    val contextPrompt = memorySection + actionGuide +
+                                        "\n\nVisible Android screen context:\n$screenContext\n\nRecent conversation:\n$recentChat\n\nRespond to the latest user message."
                                     val reply = AiClient().ask(provider, model, key, contextPrompt, photo)
-                                    messages.add(ChatMessage(reply, false))
-                                    lastReply = reply
+                                    val proposedAction = PhoneAction.parse(reply)
+                                    if (proposedAction != null) {
+                                        pendingAction = proposedAction
+                                        messages.add(ChatMessage("I prepared a phone action. Review the confirmation card below before it runs.", false))
+                                        lastReply = "Proposed action: ${proposedAction.description}"
+                                    } else {
+                                        messages.add(ChatMessage(reply, false))
+                                        lastReply = reply
+                                        tts?.speak(reply, TextToSpeech.QUEUE_FLUSH, Bundle(), "assistant-reply")
+                                    }
                                     status = "Ready"
-                                    tts?.speak(reply, TextToSpeech.QUEUE_FLUSH, Bundle(), "assistant-reply")
                                 } catch (e: Exception) {
                                     val error = e.message ?: "Request failed."
                                     messages.add(ChatMessage(error, false)); status = error
                                 } finally { busy = false }
                             }
                         }) { Icon(Icons.Default.Send, "Send") }
+                    }
+                    if (pendingAction != null) {
+                        Surface(color = Color(0xFF2A2638), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth()) {
+                            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text("AI phone action proposal", color = Color(0xFFB7A1FF), style = MaterialTheme.typography.labelLarge)
+                                Text(pendingAction!!.description, color = Color.White)
+                                Text("Check the screen before confirming. Nothing runs until you tap Confirm.", color = Color.LightGray, style = MaterialTheme.typography.bodySmall)
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Button(onClick = {
+                                        val service = TouchControlService.active
+                                        val action = pendingAction
+                                        if (service == null || action == null) {
+                                            status = "Enable Reverse Assistant touch controls in Android Accessibility settings first."
+                                        } else {
+                                            val ok = action.execute(service)
+                                            status = if (ok) "Confirmed action was dispatched." else "Android could not dispatch that action."
+                                        }
+                                        pendingAction = null
+                                    }) { Text("CONFIRM & EXECUTE") }
+                                    TextButton(onClick = { pendingAction = null; status = "Action cancelled." }) { Text("CANCEL") }
+                                }
+                            }
+                        }
                     }
                     Text(status, color = Color(0xFFB0B0C2), style = MaterialTheme.typography.bodySmall)
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
