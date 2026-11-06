@@ -15,7 +15,7 @@
 - Provider text/image request adapters are present.
 - API key encryption and Obsidian note append are present.
 - Camera photo, voice transcription and TTS are wired into the UI.
-- Accessibility gesture primitives are present; they are not yet exposed as autonomous AI tools.
+- Accessibility exposes screen text and a validated gesture allow-list. When a phone-control request is detected, the AI can propose one action; the user must review and confirm it before dispatch.
 - There is no APK build result or device test result committed yet.
 
 ## Safety and consent
