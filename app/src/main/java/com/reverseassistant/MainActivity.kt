@@ -39,6 +39,7 @@ import com.reverseassistant.ai.AiClient
 import com.reverseassistant.ai.AiProvider
 import com.reverseassistant.memory.ObsidianVault
 import com.reverseassistant.security.SecretStore
+import com.reverseassistant.search.WebSearchClient
 import com.reverseassistant.touch.PhoneAction
 import com.reverseassistant.touch.TouchControlService
 import java.io.ByteArrayOutputStream
@@ -498,6 +499,20 @@ class MainActivity : ComponentActivity() {
                             else try { ObsidianVault.appendMemory(this@MainActivity, "Conversation note", lastReply); status = "Saved to Obsidian." }
                             catch (e: Exception) { status = e.message ?: "Connect Obsidian first." }
                         }) { Text("SAVE MEMORY") }
+                        TextButton(enabled = !busy && prompt.isNotBlank(), onClick = {
+                            val query = prompt.trim()
+                            busy = true
+                            status = "Searching the web…"
+                            scope.launch {
+                                try {
+                                    val result = withContext(Dispatchers.IO) { WebSearchClient.search(query) }
+                                    messages.add(ChatMessage("Quick web lookup for: $query\n\n$result", false))
+                                    status = "Quick lookup complete. Verify important details from the linked sources."
+                                } catch (e: Exception) {
+                                    status = e.message ?: "Web lookup failed."
+                                } finally { busy = false }
+                            }
+                        }) { Text("QUICK WEB") }
                         Button(enabled = !busy, onClick = {
                             val text = prompt.trim()
                             if (text.isEmpty()) { status = "Write a message first."; return@Button }
