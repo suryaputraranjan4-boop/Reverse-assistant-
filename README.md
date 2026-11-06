@@ -11,7 +11,7 @@ Android-first personal AI assistant. This repository is the clean implementation
 - Local chat history persisted on-device (latest 120 messages), with a clear-chat control.
 - Import user-selected TXT, Markdown, CSV, JSON, PDF, or DOCX documents into the next prompt. PDF import is limited to 20 MB and 30 pages; text context is capped at 120,000 characters. Scanned PDFs need OCR, which is not included.
 - Export chat transcripts as plain text.
-- Persist provider/model and speech preferences; toggle spoken replies, adjust speech rate/pitch, and stop current speech.
+- Persist provider/model, custom assistant personality, and speech preferences; toggle spoken replies, adjust speech rate/pitch, and stop current speech.
 - Obsidian vault integration for durable Markdown memory, with query-keyword relevance retrieval.
 - Optional Android AccessibilityService for explicit, user-authorized app launching by unique app label, taps, double taps, repeated taps, long presses, swipes, and vertical scrolling. Drag is available as a confirmed AI action.
 - Original procedural OpenGL ES 3D companion with idle movement, blinking, and speech-synchronized mouth animation. Third-party PMX/MMD character import remains separate and license-gated.
@@ -19,7 +19,7 @@ Android-first personal AI assistant. This repository is the clean implementation
 
 ## Status
 
-Implemented in this branch: local chat history, confirmed drag gestures, streaming responses for Gemini/OpenAI/Claude/OpenRouter, foreground continuous dictation (no wake word), one-shot OS-consented screen capture, TXT/Markdown/CSV/JSON/PDF/DOCX text import, chat export, speech controls, query-ranked Obsidian memory, and a procedural 3D avatar with speech-synced mouth animation. Still pending: custom PMX/MMD model import and skeletal rigging, continuous screen streaming, safe multi-step device orchestration, scanned-PDF OCR, integrated web search, external plugin integrations, offline LLM, backup/restore, diagnostics, broad provider compatibility tests, and physical-device validation.
+Implemented in this branch: local chat history, confirmed drag gestures, streaming responses for Gemini/OpenAI/Claude/OpenRouter, foreground continuous dictation (no wake word), one-shot OS-consented screen capture, TXT/Markdown/CSV/JSON/PDF/DOCX text import, chat export, speech controls, configurable assistant style, query-ranked Obsidian memory, and a procedural 3D avatar with speech-synced mouth animation. Still pending: custom PMX/MMD model import and skeletal rigging, continuous screen streaming, safe multi-step device orchestration, scanned-PDF OCR, integrated web search, external plugin integrations, offline LLM, backup/restore, diagnostics, broad provider compatibility tests, and physical-device validation.
 
 The latest feature batch is awaiting its GitHub Actions build. The earlier successful CI run (42193647302) predates these changes and is not evidence that the current branch builds. A successful CI build is not proof of physical-device compatibility. Provider calls require the user's own API keys and may incur provider charges. Physical-device testing and several advanced modules are still pending.
 
