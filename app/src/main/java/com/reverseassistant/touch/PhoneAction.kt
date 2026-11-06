@@ -42,6 +42,27 @@ data class PhoneAction(
     }
 
     companion object {
+        /** Parses a bounded plan. Each action remains individually confirmation-gated by the UI. */
+        fun parsePlan(response: String): List<PhoneAction>? {
+            return try {
+                val start = response.indexOf('{')
+                val end = response.lastIndexOf('}')
+                if (start < 0 || end <= start) return null
+                val root = JSONObject(response.substring(start, end + 1))
+                val array = root.optJSONArray("phone_actions")
+                if (array == null) {
+                    val single = parse(response) ?: return null
+                    return listOf(single)
+                }
+                if (array.length() !in 1..5) return null
+                val plan = (0 until array.length()).map { index ->
+                    val item = array.optJSONObject(index) ?: return null
+                    parse(JSONObject().put("phone_action", item).toString()) ?: return null
+                }
+                plan
+            } catch (_: Exception) { null }
+        }
+
         fun parse(response: String): PhoneAction? {
             return try {
                 val start = response.indexOf('{')
