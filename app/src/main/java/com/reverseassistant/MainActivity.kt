@@ -249,6 +249,7 @@ class MainActivity : ComponentActivity() {
         var speakReplies by remember { mutableStateOf(settingsPrefs.getBoolean("speak_replies", true)) }
         var assistantPersona by remember { mutableStateOf(settingsPrefs.getString("assistant_persona", "Helpful, clear, and concise") ?: "Helpful, clear, and concise") }
         var liveListening by remember { mutableStateOf(false) }
+        var wakeWordActive by remember { mutableStateOf(WakeWordService.active) }
         var continuousScreen by remember { mutableStateOf(false) }
         var continuousScreenRequested by remember { mutableStateOf(false) }
         var avatarSpeaking by remember { mutableStateOf(false) }
@@ -270,6 +271,17 @@ class MainActivity : ComponentActivity() {
         DisposableEffect(Unit) {
             avatarSpeakingCallback = { speaking -> avatarSpeaking = speaking }
             onDispose { avatarSpeakingCallback = null }
+        }
+        DisposableEffect(Unit) {
+            WakeWordService.onCommand = { command ->
+                prompt = command
+                status = "Wake phrase detected. Review the command, then press Send."
+            }
+            WakeWordService.onStopped = { wakeWordActive = false }
+            onDispose {
+                WakeWordService.onCommand = null
+                WakeWordService.onStopped = null
+            }
         }
         LaunchedEffect(provider, model, speakReplies, speechRate, speechPitch, assistantPersona) {
             settingsPrefs.edit().putString("provider", provider.name).putString("model", model)
@@ -299,6 +311,17 @@ class MainActivity : ComponentActivity() {
                 status = "Microphone permission was not granted."
                 liveListening = false
             }
+        }
+        val wakeWordPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) {
+                try {
+                    startForegroundService(Intent(this@MainActivity, WakeWordService::class.java))
+                    wakeWordActive = true
+                    status = "Wake phrase listener started. A persistent notification is visible; say Hey Reverse."
+                } catch (e: Exception) {
+                    status = e.message ?: "Could not start the wake phrase service."
+                }
+            } else status = "Microphone permission is required for wake phrase listening."
         }
         val screenCapture = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             if (result.resultCode == RESULT_OK && result.data != null) {
@@ -540,6 +563,15 @@ class MainActivity : ComponentActivity() {
                         TextButton(onClick = { backupExport.launch("reverse-assistant-backup.json") }) { Text("BACKUP") }
                         TextButton(onClick = { backupImport.launch(arrayOf("application/json", "text/json")) }) { Text("RESTORE") }
                         TextButton(onClick = { diagnosticsExport.launch("reverse-assistant-diagnostics.txt") }) { Text("DIAGNOSTICS") }
+                        TextButton(onClick = {
+                            if (wakeWordActive || WakeWordService.active) {
+                                startService(Intent(this@MainActivity, WakeWordService::class.java).setAction(WakeWordService.ACTION_STOP))
+                                wakeWordActive = false
+                                status = "Wake phrase listening stopped."
+                            } else {
+                                wakeWordPermission.launch(Manifest.permission.RECORD_AUDIO)
+                            }
+                        }) { Text(if (wakeWordActive) "STOP WAKE WORD" else "WAKE WORD") }
                         TextButton(onClick = {
                             if (liveListening) {
                                 val wasListening = liveListening
