@@ -5,6 +5,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
+import android.media.projection.MediaProjectionManager
 import android.speech.RecognitionListener
 import android.os.Handler
 import android.os.Looper
@@ -252,6 +253,30 @@ class MainActivity : ComponentActivity() {
                 liveListening = false
             }
         }
+        val screenCapture = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode == RESULT_OK && result.data != null) {
+                ScreenCaptureService.onScreenshot = { bytes ->
+                    if (bytes != null) {
+                        image = bytes
+                        status = "Screen screenshot attached. It will be sent only when you press Send."
+                    } else {
+                        status = "Screen capture did not complete. Try again."
+                    }
+                }
+                try {
+                    val serviceIntent = Intent(this@MainActivity, ScreenCaptureService::class.java)
+                        .putExtra(ScreenCaptureService.EXTRA_RESULT_CODE, result.resultCode)
+                        .putExtra(ScreenCaptureService.EXTRA_DATA, result.data)
+                    startForegroundService(serviceIntent)
+                    status = "Capturing the screen you approved…"
+                } catch (e: Exception) {
+                    ScreenCaptureService.onScreenshot = null
+                    status = e.message ?: "Could not start screen capture."
+                }
+            } else {
+                status = "Screen capture cancelled."
+            }
+        }
         val camera = rememberLauncherForActivityResult(ActivityResultContracts.TakePicturePreview()) { bitmap ->
             if (bitmap != null) {
                 val out = ByteArrayOutputStream()
@@ -350,11 +375,15 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                     }
-                    if (image != null) Text("📷 Image attached", color = Color(0xFF80CBC4))
+                    if (image != null) Text("📷 Photo/screen capture attached — sent only when you press Send", color = Color(0xFF80CBC4))
                     if (attachedDocument.isNotBlank()) Text("📄 " + attachedDocumentName + " attached — sent only when you press Send", color = Color(0xFF80CBC4), style = MaterialTheme.typography.bodySmall)
                     OutlinedTextField(value = prompt, onValueChange = { prompt = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Message Reverse Assistant") }, minLines = 2)
                     FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         IconButton(onClick = { camera.launch(null) }) { Icon(Icons.Default.CameraAlt, "Camera", tint = Color.White) }
+                        TextButton(onClick = {
+                            val manager = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+                            screenCapture.launch(manager.createScreenCaptureIntent())
+                        }) { Text("SCREEN") }
                         TextButton(onClick = { documentPicker.launch(arrayOf("text/plain", "text/markdown", "text/csv", "application/json")) }) { Text("FILE") }
                         TextButton(onClick = { exportChat.launch("reverse-assistant-chat.txt") }) { Text("EXPORT") }
                         TextButton(onClick = {
