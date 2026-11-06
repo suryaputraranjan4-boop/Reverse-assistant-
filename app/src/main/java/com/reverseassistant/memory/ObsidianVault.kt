@@ -35,6 +35,32 @@ object ObsidianVault {
         } catch (_: Exception) { "" }
     }
 
+    /** Retrieves the most relevant Markdown sections instead of blindly sending the whole vault note. */
+    fun readRelevantMemory(context: Context, query: String, maxChars: Int = 9000): String {
+        val raw = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(TREE, null)
+            ?: return ""
+        return try {
+            val root = DocumentFile.fromTreeUri(context, Uri.parse(raw)) ?: return ""
+            val folder = root.findFile("Reverse Assistant") ?: return ""
+            val file = folder.findFile("Assistant Memory.md") ?: return ""
+            val all = context.contentResolver.openInputStream(file.uri)?.bufferedReader(Charsets.UTF_8)?.use {
+                it.readText().takeLast(80_000)
+            }.orEmpty()
+            if (all.isBlank()) return ""
+            val terms = query.lowercase(Locale.ROOT).split(Regex("[^\\p{L}\\p{N}]+"))
+                .filter { it.length >= 3 }.toSet()
+            if (terms.isEmpty()) return all.takeLast(maxChars)
+            val sections = all.split(Regex("(?m)(?=^## )")).filter { it.isNotBlank() }
+            val ranked = sections.mapIndexed { index, section ->
+                val text = section.lowercase(Locale.ROOT)
+                val score = terms.sumOf { term -> if (text.contains(term)) 1 else 0 }
+                Triple(index, score, section)
+            }.filter { it.second > 0 }.sortedWith(compareByDescending<Triple<Int, Int, String>> { it.second }.thenByDescending { it.first })
+            val selected = ranked.take(6).sortedBy { it.first }.joinToString("\\n\\n") { it.third }
+            (if (selected.isBlank()) all.takeLast(maxChars) else selected).takeLast(maxChars)
+        } catch (_: Exception) { "" }
+    }
+
     fun appendMemory(context: Context, title: String, content: String): String {
         val raw = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(TREE, null)
             ?: error("Choose your Obsidian vault first.")
