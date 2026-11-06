@@ -1090,6 +1090,7 @@ class MainActivity : ComponentActivity() {
             var draft by remember { mutableStateOf(SecretStore.get(this@MainActivity, provider.secretName)) }
             var personaDraft by remember { mutableStateOf(assistantPersona) }
             var endpointDraft by remember { mutableStateOf(customEndpoint) }
+            var connectionTest by remember { mutableStateOf("") }
             AlertDialog(
                 onDismissRequest = { showSettings = false },
                 title = { Text("${provider.label} API key") },
@@ -1105,6 +1106,28 @@ class MainActivity : ComponentActivity() {
                         OutlinedTextField(value = endpointDraft, onValueChange = { endpointDraft = it.take(500) },
                             label = { Text("HTTPS chat-completions endpoint") }, singleLine = true)
                         Text("Only trusted HTTPS OpenAI-compatible endpoints are accepted.", style = MaterialTheme.typography.bodySmall)
+                    }
+                    if (provider != AiProvider.LOCAL_LLAMA) {
+                        TextButton(enabled = !busy && draft.isNotBlank(), onClick = {
+                            scope.launch {
+                                busy = true
+                                connectionTest = "Testing ${provider.label} chat API…"
+                                try {
+                                    val reply = AiClient().ask(
+                                        provider = provider,
+                                        model = model,
+                                        apiKey = draft,
+                                        prompt = "Reply with exactly: OK",
+                                        customEndpoint = if (provider == AiProvider.CUSTOM_OPENAI_COMPATIBLE) endpointDraft else null
+                                    )
+                                    connectionTest = "Connected. Test reply: " + reply.take(100)
+                                } catch (error: Exception) {
+                                    connectionTest = "Test failed: " + (error.message ?: "Unknown provider error")
+                                } finally { busy = false }
+                            }
+                        }) { Text("TEST CHAT API") }
+                        Text("A test sends one short request and may use provider credits.", style = MaterialTheme.typography.bodySmall)
+                        if (connectionTest.isNotBlank()) Text(connectionTest, style = MaterialTheme.typography.bodySmall)
                     }
                     OutlinedTextField(value = personaDraft, onValueChange = { personaDraft = it.take(300) }, label = { Text("Assistant personality / style") }, minLines = 2)
                     Row(verticalAlignment = Alignment.CenterVertically) {
