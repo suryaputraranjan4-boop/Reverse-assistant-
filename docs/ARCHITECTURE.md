@@ -16,7 +16,7 @@
 - Chat history, transcript export, backup/restore, provider/model preferences, encrypted API-key storage, and assistant style preferences.
 - Provider streaming adapters and one-shot image input for supported providers. Provider-specific live compatibility still needs broader validation.
 - Ranked DuckDuckGo HTML search with source links; subject to network availability and rate limits.
-- Bounded TXT/Markdown/CSV/JSON/PDF/DOCX extraction. PDF import is capped at 20 MB, 30 pages, and 120,000 output characters. Scanned PDFs are not OCR'd.
+- Bounded TXT/Markdown/CSV/JSON/PDF/DOCX extraction. PDF import is capped at 20 MB, 30 pages, and 120,000 output characters. Scanned PDFs fall back to on-device ML Kit OCR for Latin and Devanagari scripts.
 - MediaProjection screen sampling with explicit OS consent, foreground notification, and Stop action. Latest frame is attached only to the next message the user sends.
 - Wake phrase service with explicit start/stop and persistent notification. Recognition may rely on Android's speech provider/network.
 - Accessibility actions are allow-listed, user-requested, and individually confirmed. Failed or cancelled steps stop the remaining plan.
@@ -27,7 +27,7 @@
 - Imported PMX/MMD rendering, skeletal rigging, animation retargeting, and imported-model lip sync.
 - Direct live screen-video streaming to an AI provider.
 - Dedicated offline wake-word detection and offline LLM runtime/model management.
-- Scanned-PDF OCR.
+- OCR scripts beyond Latin and Devanagari, handwriting recognition, and exact document layout reconstruction.
 - External MCP/plugin server adapters and user-configurable third-party connectors.
 - Broad provider compatibility and physical-device testing.
 
@@ -42,6 +42,6 @@ The app includes an original procedural OpenGL ES 2.0 companion built from gener
 ## Document import
 
 - TXT/Markdown/CSV/JSON import is capped at 1.5 MB raw input.
-- PDF text extraction uses PDFBox-Android, caps files at 20 MB and extraction at 30 pages / 120,000 characters. Image-only/scanned pages are not OCR'd.
+- PDF text extraction uses PDFBox-Android, caps files at 20 MB and extraction at 30 pages / 120,000 characters. Image-only/scanned pages are rendered locally and OCR'd with bundled ML Kit Latin and Devanagari models.
 - DOCX extraction reads the main WordprocessingML document text; embedded objects, comments, tracked changes, and complex layout are not preserved.
 - Parsing runs on an IO dispatcher. Selected document text is included only in the next message sent by the user.
