@@ -19,7 +19,8 @@ object ModelPackageImporter {
         val pmxCount: Int,
         val textureCount: Int,
         val nestedArchiveCount: Int,
-        val expandedBytes: Long
+        val expandedBytes: Long,
+        val firstPmxPath: String
     ) {
         val summary: String get() =
             "$pmxCount PMX model(s), $textureCount texture(s), $nestedArchiveCount nested archive(s)"
@@ -38,12 +39,14 @@ object ModelPackageImporter {
             context.contentResolver.openInputStream(uri)?.use { input ->
                 extract(input, folder, folder, 0, budget)
             } ?: error("Could not open the selected model package.")
-            val pmx = folder.walkTopDown().count { it.isFile && it.extension.equals("pmx", true) }
+            val pmxFiles = folder.walkTopDown().filter { it.isFile && it.extension.equals("pmx", true) }.toList()
+            val pmx = pmxFiles.size
+            val firstPmx = pmxFiles.firstOrNull()
             val textures = folder.walkTopDown().count {
                 it.isFile && it.extension.lowercase() in setOf("png", "jpg", "jpeg", "bmp", "tga", "dds")
             }
-            require(pmx > 0) { "No PMX model was found in this archive. Choose a PMX model ZIP." }
-            return Result(folder.name, pmx, textures, budget.nestedArchives, budget.bytes)
+            require(pmx > 0 && firstPmx != null) { "No PMX model was found in this archive. Choose a PMX model ZIP." }
+            return Result(folder.name, pmx, textures, budget.nestedArchives, budget.bytes, firstPmx.absolutePath)
         } catch (error: Exception) {
             folder.deleteRecursively()
             throw error

@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.reverseassistant.ai.AiClient
 import com.reverseassistant.ai.AiProvider
+import com.reverseassistant.mmd.PmxModelNative
 import com.reverseassistant.ai.GeminiLiveVideoSession
 import com.reverseassistant.mcp.McpServerDialog
 import com.reverseassistant.local.OfflineLlmManager
@@ -270,6 +271,7 @@ class MainActivity : ComponentActivity() {
         var attachedDocument by remember { mutableStateOf("") }
         var attachedDocumentName by remember { mutableStateOf("") }
         var importedModelStatus by remember { mutableStateOf("") }
+        var importedMeshData by remember { mutableStateOf<FloatArray?>(null) }
         var prompt by remember { mutableStateOf("") }
         var apiKey by remember { mutableStateOf("") }
         var customEndpoint by remember { mutableStateOf(settingsPrefs.getString("custom_provider_endpoint", "") ?: "") }
@@ -572,8 +574,12 @@ class MainActivity : ComponentActivity() {
                         val imported = withContext(Dispatchers.IO) {
                             ModelPackageImporter.import(this@MainActivity, uri)
                         }
+                        val mesh = withContext(Dispatchers.IO) {
+                            PmxModelNative.loadTriangleVertices(imported.firstPmxPath)
+                        } ?: error("The PMX file was extracted, but Assimp could not create a renderable triangle mesh.")
+                        importedMeshData = mesh
                         importedModelStatus = imported.summary
-                        status = "Model assets imported locally (${imported.summary}). The current avatar renderer still uses its built-in procedural model; PMX skeletal rendering is not connected yet."
+                        status = "PMX mesh loaded into the 3D preview. Bone animation, VMD motion, physics, and texture maps are still pending."
                     } catch (e: Exception) {
                         status = e.message ?: "Could not import the model package."
                     }
@@ -677,7 +683,10 @@ class MainActivity : ComponentActivity() {
                             }
                             AndroidView(
                                 factory = { context -> Avatar3DView(context).also { avatarView = it } },
-                                update = { view -> view.setSpeaking(avatarSpeaking) },
+                                update = { view ->
+                                    view.setSpeaking(avatarSpeaking)
+                                    view.setImportedMesh(importedMeshData)
+                                },
                                 modifier = Modifier.width(116.dp).height(132.dp).background(Color(0xFF0B1020), RoundedCornerShape(20.dp))
                             )
                         }
