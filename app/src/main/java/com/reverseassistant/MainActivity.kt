@@ -236,6 +236,7 @@ class MainActivity : ComponentActivity() {
         }
         var model by remember { mutableStateOf(settingsPrefs.getString("model", null) ?: provider.defaultModel) }
         var speakReplies by remember { mutableStateOf(settingsPrefs.getBoolean("speak_replies", true)) }
+        var assistantPersona by remember { mutableStateOf(settingsPrefs.getString("assistant_persona", "Helpful, clear, and concise") ?: "Helpful, clear, and concise") }
         var liveListening by remember { mutableStateOf(false) }
         var avatarSpeaking by remember { mutableStateOf(false) }
         var speechRate by remember { mutableFloatStateOf(settingsPrefs.getFloat("speech_rate", 1.0f).coerceIn(0.6f, 1.5f)) }
@@ -254,9 +255,10 @@ class MainActivity : ComponentActivity() {
             avatarSpeakingCallback = { speaking -> avatarSpeaking = speaking }
             onDispose { avatarSpeakingCallback = null }
         }
-        LaunchedEffect(provider, model, speakReplies, speechRate, speechPitch) {
+        LaunchedEffect(provider, model, speakReplies, speechRate, speechPitch, assistantPersona) {
             settingsPrefs.edit().putString("provider", provider.name).putString("model", model)
-                .putBoolean("speak_replies", speakReplies).putFloat("speech_rate", speechRate)
+                .putBoolean("speak_replies", speakReplies).putString("assistant_persona", assistantPersona)
+                .putFloat("speech_rate", speechRate)
                 .putFloat("speech_pitch", speechPitch).apply()
             tts?.setSpeechRate(speechRate)
             tts?.setPitch(speechPitch)
@@ -487,7 +489,7 @@ class MainActivity : ComponentActivity() {
                                     val documentSection = if (attachedDocument.isBlank()) "" else
                                         "User-attached document (" + attachedDocumentName.take(80) + "; user explicitly attached it for this request):\n" +
                                         attachedDocument.take(120000) + "\n\n"
-                                    val contextPrompt = memorySection + documentSection + actionGuide +
+                                    val contextPrompt = "Assistant style preference: " + assistantPersona.take(300) + "\n\n" + memorySection + documentSection + actionGuide +
                                         "\n\nVisible Android screen context (only if explicitly requested):\n$screenContext\n\nRecent conversation:\n$recentChat\n\nRespond to the latest user message."
                                     val reply = AiClient().askStreaming(provider, model, key, contextPrompt, photo) { delta ->
                                         if (!requestsPhoneControl && assistantMessageIndex in messages.indices) {
@@ -557,12 +559,14 @@ class MainActivity : ComponentActivity() {
 
         if (showSettings) {
             var draft by remember { mutableStateOf(SecretStore.get(this@MainActivity, provider.secretName)) }
+            var personaDraft by remember { mutableStateOf(assistantPersona) }
             AlertDialog(
                 onDismissRequest = { showSettings = false },
                 title = { Text("${provider.label} API key") },
                 text = { Column {
                     OutlinedTextField(value = draft, onValueChange = { draft = it }, label = { Text("API key") }, singleLine = true)
                     Text("Stored encrypted with Android Keystore. Never commit API keys.", style = MaterialTheme.typography.bodySmall)
+                    OutlinedTextField(value = personaDraft, onValueChange = { personaDraft = it.take(300) }, label = { Text("Assistant personality / style") }, minLines = 2)
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(checked = speakReplies, onCheckedChange = { speakReplies = it })
                         Text("Speak AI replies")
@@ -574,7 +578,8 @@ class MainActivity : ComponentActivity() {
                 } },
                 confirmButton = { TextButton(onClick = {
                     SecretStore.put(this@MainActivity, provider.secretName, draft)
-                    apiKey = draft; showSettings = false; status = "Key saved on this device."
+                    assistantPersona = personaDraft
+                    apiKey = draft; showSettings = false; status = "Settings saved on this device."
                 }) { Text("SAVE") } },
                 dismissButton = { TextButton(onClick = { showSettings = false }) { Text("CANCEL") } }
             )
