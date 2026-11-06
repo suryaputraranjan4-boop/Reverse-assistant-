@@ -28,7 +28,7 @@ class Avatar3DView(context: Context) : GLSurfaceView(context) {
     }
 }
 
-private class AvatarRenderer : Renderer {
+private class AvatarRenderer : GLSurfaceView.Renderer {
     @Volatile var speaking = false
     private var program = 0
     private var positionHandle = 0
