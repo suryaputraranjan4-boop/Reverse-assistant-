@@ -33,6 +33,24 @@ class PhoneActionTest {
     }
 
     @Test
+    fun parsesBoundedMultiStepPlanInOrder() {
+        val plan = PhoneAction.parsePlan(
+            """{"phone_actions":[{"type":"tap","x":0.2,"y":0.3},{"type":"swipe","x":0.1,"y":0.8,"x2":0.9,"y2":0.2}]}"""
+        )
+
+        requireNotNull(plan)
+        assertEquals(2, plan.size)
+        assertEquals("tap", plan[0].type)
+        assertEquals("swipe", plan[1].type)
+    }
+
+    @Test
+    fun rejectsPlansLongerThanFiveSteps() {
+        val actions = (1..6).joinToString(",") { """{"type":"tap"}""" }
+        assertNull(PhoneAction.parsePlan("""{"phone_actions":[$actions]}"""))
+    }
+
+    @Test
     fun rejectsUnknownActionTypes() {
         assertNull(PhoneAction.parse("""{"phone_action":{"type":"execute_shell"}}"""))
     }
