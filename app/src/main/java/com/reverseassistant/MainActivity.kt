@@ -43,6 +43,8 @@ import com.reverseassistant.touch.TouchControlService
 import java.io.ByteArrayOutputStream
 import java.util.Locale
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -317,15 +319,20 @@ class MainActivity : ComponentActivity() {
         }
         val documentPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
             if (uri != null) {
-                try {
-                    attachedDocument = DocumentTextExtractor.extract(this@MainActivity, uri)
-                    attachedDocumentName = DocumentTextExtractor.displayName(uri)
-                    status = if (attachedDocument.isBlank()) {
-                        "No readable text found. Scanned PDFs may need OCR."
-                    } else {
-                        "Document text attached (up to 120,000 characters). It is sent only when you press Send."
-                    }
-                } catch (e: Exception) { status = e.message ?: "Could not read document." }
+                scope.launch {
+                    try {
+                        val extracted = withContext(Dispatchers.IO) {
+                            DocumentTextExtractor.extract(this@MainActivity, uri)
+                        }
+                        attachedDocument = extracted
+                        attachedDocumentName = DocumentTextExtractor.displayName(uri)
+                        status = if (attachedDocument.isBlank()) {
+                            "No readable text found. Scanned PDFs may need OCR."
+                        } else {
+                            "Document text attached (up to 120,000 characters). It is sent only when you press Send."
+                        }
+                    } catch (e: Exception) { status = e.message ?: "Could not read document." }
+                }
             }
         }
         val exportChat = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
