@@ -15,7 +15,7 @@ Android-first personal AI assistant. This repository is the clean implementation
 
 ## Status
 
-This is an initial Android project foundation, not a finished or production-ready APK. Build and device validation are required before release. Provider calls require the user's own API keys and may incur provider charges.
+The Android project currently builds successfully in GitHub Actions and uploads a debug APK artifact (workflow run 42193647302). This is a verified CI build, not proof of production readiness or physical-device compatibility. Provider calls require the user's own API keys and may incur provider charges. Physical-device testing and several advanced modules are still pending.
 
 ## Build
 
@@ -30,7 +30,7 @@ The GitHub Actions workflow also builds and uploads a debug APK on pushes and pu
 ## Permissions and privacy
 
 - Camera and microphone are requested only when the corresponding feature is used.
-- Touch automation is disabled until the user manually enables the accessibility service in Android Settings.
+- Touch automation is disabled until the user manually enables the accessibility service in Android Settings. Screen text is not collected for ordinary chat; it is accessed only when a message is detected as an explicit phone-control request, and proposed gestures require a separate confirmation.
 - The service must describe its actions and only execute a user-requested task; it does not silently operate in the background.
 - Obsidian access is granted through Android's Storage Access Framework folder picker. The app writes Markdown files only inside the selected vault.
 - API keys are stored locally using an Android Keystore-backed encryption key. Do not paste keys into chat or commit them.
