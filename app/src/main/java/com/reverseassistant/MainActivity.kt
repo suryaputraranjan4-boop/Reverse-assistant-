@@ -154,7 +154,10 @@ class MainActivity : ComponentActivity() {
                             image = null
                             scope.launch {
                                 try {
-                                    val reply = AiClient().ask(provider, model, key, text, photo)
+                                    val savedMemory = ObsidianVault.readMemory(this@MainActivity)
+                                    val contextPrompt = if (savedMemory.isBlank()) text else
+                                        "Relevant user-approved Obsidian memory (use only when relevant):\n$savedMemory\n\nCurrent request:\n$text"
+                                    val reply = AiClient().ask(provider, model, key, contextPrompt, photo)
                                     messages.add(ChatMessage(reply, false))
                                     lastReply = reply
                                     status = "Ready"
