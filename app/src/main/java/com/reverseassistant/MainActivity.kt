@@ -688,9 +688,9 @@ class MainActivity : ComponentActivity() {
         }
 
         if (showPlugins) {
-            val enabledPlugins = PluginRegistry.plugins.associate { plugin ->
+            val enabledPlugins = remember(pluginRevision) { PluginRegistry.plugins.associate { plugin ->
                 plugin.id to PluginRegistry.isEnabled(this@MainActivity, plugin.id)
-            }
+            } }
             AlertDialog(
                 onDismissRequest = { showPlugins = false },
                 title = { Text("IN-APP PLUGINS") },
