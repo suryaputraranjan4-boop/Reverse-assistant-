@@ -8,12 +8,15 @@ Android-first personal AI assistant. This repository is the clean implementation
 - Provider switcher for Google Gemini, OpenAI, Anthropic Claude, and OpenRouter.
 - Camera capture for user-requested image/scene analysis.
 - Voice input and spoken replies using Android speech services.
+- Local chat history persisted on-device (latest 120 messages), with a clear-chat control.
 - Obsidian vault integration for durable Markdown memory.
-- Optional Android AccessibilityService for explicit, user-authorized app launching by unique app label, taps, double taps, repeated taps, long presses, swipes, drags, and vertical scrolling.
+- Optional Android AccessibilityService for explicit, user-authorized app launching by unique app label, taps, double taps, repeated taps, long presses, swipes, and vertical scrolling. Drag is available as a confirmed AI action.
 - 3D avatar interface as a separate renderer module; character assets are imported locally unless redistribution rights are confirmed.
 - API credentials encrypted with Android Keystore and never committed to Git.
 
 ## Status
+
+Chat history persistence and the AI drag action have now been added. The remaining live voice, avatar renderer, screen-sharing, streaming, and multi-step orchestration work is still pending.
 
 The Android project currently builds successfully in GitHub Actions and uploads a debug APK artifact (workflow run 42193647302). This is a verified CI build, not proof of production readiness or physical-device compatibility. Provider calls require the user's own API keys and may incur provider charges. Physical-device testing and several advanced modules are still pending.
 
