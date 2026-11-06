@@ -41,4 +41,11 @@ class McpServerClientTest {
             McpServerClient.validateEndpoint("https://example.com/mcp#fragment")
         }
     }
+
+    @Test
+    fun rejectsQueryStringCredentials() {
+        assertThrows(IllegalArgumentException::class.java) {
+            McpServerClient.validateEndpoint("https://example.com/mcp?token=secret")
+        }
+    }
 }
