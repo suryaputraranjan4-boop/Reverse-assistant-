@@ -18,7 +18,7 @@ import java.util.concurrent.TimeUnit
  */
 class GeminiLiveVideoSession(
     apiKey: String,
-    private val model: String = "gemini-2.5-flash-native-audio-preview-12-2025",
+    private val model: String = "gemini-3.1-flash-live-preview",
     private val onReady: () -> Unit,
     private val onText: (String) -> Unit,
     private val onError: (String) -> Unit
@@ -27,12 +27,14 @@ class GeminiLiveVideoSession(
         .readTimeout(0, TimeUnit.MILLISECONDS)
         .pingInterval(20, TimeUnit.SECONDS)
         .build()
-    private val socketUrl: HttpUrl = HttpUrl.Builder()
-        .scheme("wss")
+    private val socketUrl: String = HttpUrl.Builder()
+        .scheme("https")
         .host("generativelanguage.googleapis.com")
         .addPathSegments("ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent")
         .addQueryParameter("key", apiKey)
         .build()
+        .toString()
+        .replaceFirst("https://", "wss://")
     @Volatile private var socket: WebSocket? = null
     @Volatile private var setupComplete = false
     @Volatile private var closed = false
@@ -43,7 +45,7 @@ class GeminiLiveVideoSession(
     fun start() {
         check(!closed) { "Live session has already been closed." }
         socket = client.newWebSocket(
-            Request.Builder().url(socketUrl.toString().replaceFirst("https://", "wss://")).build(),
+            Request.Builder().url(socketUrl).build(),
             object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
                 val setup = JSONObject().put("setup", JSONObject()
