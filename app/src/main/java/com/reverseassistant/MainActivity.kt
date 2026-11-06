@@ -155,8 +155,13 @@ class MainActivity : ComponentActivity() {
                             scope.launch {
                                 try {
                                     val savedMemory = ObsidianVault.readMemory(this@MainActivity)
-                                    val contextPrompt = if (savedMemory.isBlank()) text else
-                                        "Relevant user-approved Obsidian memory (use only when relevant):\n$savedMemory\n\nCurrent request:\n$text"
+                                    val recentChat = messages.takeLast(12).joinToString("\n") {
+                                        (if (it.fromUser) "User: " else "Assistant: ") + it.text
+                                    }
+                                    val memorySection = if (savedMemory.isBlank()) "" else
+                                        "Relevant user-approved Obsidian memory (use only when relevant):\n$savedMemory\n\n"
+                                    val contextPrompt = memorySection +
+                                        "Recent conversation for context:\n$recentChat\n\nRespond to the latest user message."
                                     val reply = AiClient().ask(provider, model, key, contextPrompt, photo)
                                     messages.add(ChatMessage(reply, false))
                                     lastReply = reply
