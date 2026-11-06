@@ -148,8 +148,8 @@ class McpServerClient(
             }
             val scheme = uri.scheme?.lowercase()
             val host = uri.host?.lowercase()
-            require(host != null && uri.userInfo == null && uri.fragment == null) {
-                "MCP URL must include a host and cannot contain credentials or a fragment."
+            require(host != null && uri.userInfo == null && uri.fragment == null && uri.rawQuery == null) {
+                "MCP URL must include a host and cannot contain credentials, query strings, or fragments. Put tokens in the encrypted token field."
             }
             val loopback = host == "localhost" || host == "127.0.0.1" || host == "::1"
             require(scheme == "https" || (scheme == "http" && loopback)) {
