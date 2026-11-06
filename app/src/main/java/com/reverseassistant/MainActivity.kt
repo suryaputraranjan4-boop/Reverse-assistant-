@@ -484,61 +484,145 @@ class MainActivity : ComponentActivity() {
         }
 
         MaterialTheme(colorScheme = darkColorScheme(
-            primary = Color(0xFFB7A1FF), secondary = Color(0xFF80CBC4),
-            background = Color(0xFF101018), surface = Color(0xFF1B1B28)
+            primary = Color(0xFFB9A5FF), onPrimary = Color(0xFF171329),
+            secondary = Color(0xFF67E8D5), onSecondary = Color(0xFF062A27),
+            background = Color(0xFF080B14), onBackground = Color(0xFFF4F5FB),
+            surface = Color(0xFF111827), onSurface = Color(0xFFF4F5FB),
+            surfaceVariant = Color(0xFF1B2638), onSurfaceVariant = Color(0xFFA9B5C9),
+            outline = Color(0xFF344156)
         )) {
             Scaffold(
                 topBar = {
                     TopAppBar(
-                        title = { Column { Text("REVERSE ASSISTANT"); Text("Android AI companion", style = MaterialTheme.typography.labelSmall) } },
-                        actions = {
-                            TextButton(onClick = { showPlugins = true }) { Text("PLUGINS") }
-                            TextButton(onClick = { showSettings = true }) { Text("SETTINGS") }
-                        },
-                        colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF171722), titleContentColor = Color.White)
-                    )
-                },
-                containerColor = Color(0xFF101018)
-            ) { padding ->
-                Column(Modifier.fillMaxSize().padding(padding).padding(14.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box {
-                            OutlinedButton(onClick = { showProviderMenu = true }) { Text(provider.label + " ▾") }
-                            DropdownMenu(expanded = showProviderMenu, onDismissRequest = { showProviderMenu = false }) {
-                                AiProvider.values().forEach { item ->
-                                    DropdownMenuItem(text = { Text(item.label) }, onClick = {
-                                        provider = item; model = item.defaultModel
-                                        apiKey = SecretStore.get(this@MainActivity, item.secretName)
-                                        showProviderMenu = false
-                                    })
+                        title = {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(11.dp)) {
+                                Surface(shape = RoundedCornerShape(14.dp), color = Color(0xFF292344)) {
+                                    Box(Modifier.size(40.dp), contentAlignment = Alignment.Center) {
+                                        Text("R", color = Color(0xFFC8B8FF), style = MaterialTheme.typography.titleLarge)
+                                    }
+                                }
+                                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                    Text("Reverse Assistant", style = MaterialTheme.typography.titleMedium)
+                                    Text("PERSONAL AI COMPANION", color = Color(0xFF9AA8BF), style = MaterialTheme.typography.labelSmall)
                                 }
                             }
-                        }
-                        Spacer(Modifier.width(8.dp))
-                        OutlinedTextField(value = model, onValueChange = { model = it }, label = { Text("Model ID") }, singleLine = true, modifier = Modifier.weight(1f))
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    Text("3D COMPANION", color = Color(0xFFB7A1FF), style = MaterialTheme.typography.labelMedium)
-                    if (importedModelStatus.isNotBlank()) Text("Imported assets: $importedModelStatus", color = Color(0xFF80CBC4), style = MaterialTheme.typography.bodySmall)
-                    AndroidView(
-                        factory = { context -> Avatar3DView(context).also { avatarView = it } },
-                        update = { view -> view.setSpeaking(avatarSpeaking) },
-                        modifier = Modifier.fillMaxWidth().height(180.dp).background(Color(0xFF1B1B28), RoundedCornerShape(18.dp))
+                        },
+                        actions = {
+                            TextButton(onClick = { showPlugins = true }) { Text("PLUGINS", style = MaterialTheme.typography.labelMedium) }
+                            TextButton(onClick = { showSettings = true }) { Text("SETTINGS", style = MaterialTheme.typography.labelMedium) }
+                        },
+                        colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0B1020), titleContentColor = Color(0xFFF4F5FB))
                     )
-                    Spacer(Modifier.height(8.dp))
-                    LazyColumn(Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        items(messages) { msg ->
-                            Row(Modifier.fillMaxWidth(), horizontalArrangement = if (msg.fromUser) Arrangement.End else Arrangement.Start) {
-                                Surface(color = if (msg.fromUser) Color(0xFF34304A) else Color(0xFF222231), shape = RoundedCornerShape(16.dp)) {
-                                    Text(msg.text, Modifier.padding(12.dp), color = Color.White)
+                },
+                containerColor = Color(0xFF080B14)
+            ) { padding ->
+                Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(), color = Color(0xFF111827),
+                        shape = RoundedCornerShape(20.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF253149))
+                    ) {
+                        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Box {
+                                OutlinedButton(onClick = { showProviderMenu = true }, shape = RoundedCornerShape(14.dp),
+                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFC9BCFF))
+                                ) { Text(provider.label + " ▾") }
+                                DropdownMenu(expanded = showProviderMenu, onDismissRequest = { showProviderMenu = false }) {
+                                    AiProvider.values().forEach { item ->
+                                        DropdownMenuItem(text = { Text(item.label) }, onClick = {
+                                            provider = item; model = item.defaultModel
+                                            apiKey = SecretStore.get(this@MainActivity, item.secretName)
+                                            showProviderMenu = false
+                                        })
+                                    }
+                                }
+                            }
+                            Spacer(Modifier.width(10.dp))
+                            OutlinedTextField(value = model, onValueChange = { model = it },
+                                label = { Text("Model ID") }, singleLine = true,
+                                modifier = Modifier.weight(1f), shape = RoundedCornerShape(14.dp))
+                        }
+                    }
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(), color = Color(0xFF121A2B),
+                        shape = RoundedCornerShape(24.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF283650))
+                    ) {
+                        Row(Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                                Text("YOUR AI COMPANION", color = Color(0xFFC5B5FF), style = MaterialTheme.typography.labelMedium)
+                                Text("Always ready to help.", color = Color(0xFFF4F5FB), style = MaterialTheme.typography.titleMedium)
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Box(Modifier.size(7.dp).background(if (busy) Color(0xFFFBBF24) else Color(0xFF67E8D5), RoundedCornerShape(50)))
+                                    Text(if (busy) "Working…" else "Ready · ${provider.label}", color = Color(0xFFA9B5C9), style = MaterialTheme.typography.labelSmall)
+                                }
+                                if (importedModelStatus.isNotBlank()) Text("Imported assets: $importedModelStatus", color = Color(0xFF67E8D5), style = MaterialTheme.typography.bodySmall)
+                            }
+                            AndroidView(
+                                factory = { context -> Avatar3DView(context).also { avatarView = it } },
+                                update = { view -> view.setSpeaking(avatarSpeaking) },
+                                modifier = Modifier.width(116.dp).height(132.dp).background(Color(0xFF0B1020), RoundedCornerShape(20.dp))
+                            )
+                        }
+                    }
+                    Surface(
+                        modifier = Modifier.weight(1f).fillMaxWidth(), color = Color(0xFF0D1422),
+                        shape = RoundedCornerShape(22.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF202D42))
+                    ) {
+                        LazyColumn(Modifier.fillMaxSize().padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            if (messages.isEmpty()) item {
+                                Column(Modifier.fillMaxWidth().padding(vertical = 26.dp, horizontal = 10.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Text("✦", color = Color(0xFFC5B5FF), style = MaterialTheme.typography.headlineLarge)
+                                    Text("What can I help you with?", color = Color(0xFFF4F5FB), style = MaterialTheme.typography.titleLarge)
+                                    Text("Ask a question, explore an idea, or get something done.", color = Color(0xFF9EACC1), style = MaterialTheme.typography.bodyMedium)
+                                }
+                            }
+                            items(messages) { msg ->
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = if (msg.fromUser) Arrangement.End else Arrangement.Start) {
+                                    Surface(
+                                        color = if (msg.fromUser) Color(0xFF493B70) else Color(0xFF1A2638),
+                                        shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp,
+                                            bottomStart = if (msg.fromUser) 20.dp else 6.dp,
+                                            bottomEnd = if (msg.fromUser) 6.dp else 20.dp),
+                                        border = androidx.compose.foundation.BorderStroke(1.dp,
+                                            if (msg.fromUser) Color(0xFF69589A) else Color(0xFF2B3A51)),
+                                        modifier = Modifier.widthIn(max = 320.dp)
+                                    ) {
+                                        Text(msg.text, Modifier.padding(horizontal = 15.dp, vertical = 12.dp),
+                                            color = Color(0xFFF4F5FB), style = MaterialTheme.typography.bodyLarge)
+                                    }
                                 }
                             }
                         }
                     }
                     if (image != null) Text("📷 Photo/screen capture attached — sent only when you press Send", color = Color(0xFF80CBC4))
                     if (attachedDocument.isNotBlank()) Text("📄 " + attachedDocumentName + " attached — sent only when you press Send", color = Color(0xFF80CBC4), style = MaterialTheme.typography.bodySmall)
-                    OutlinedTextField(value = prompt, onValueChange = { prompt = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Message Reverse Assistant") }, minLines = 2)
-                    FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(), color = Color(0xFF111827),
+                        shape = RoundedCornerShape(22.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF344156))
+                    ) {
+                        Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            if (image != null) Text("Photo / screen attached · sent when you press Send", color = Color(0xFF67E8D5), style = MaterialTheme.typography.labelSmall)
+                            if (attachedDocument.isNotBlank()) Text("$attachedDocumentName attached · sent when you press Send", color = Color(0xFF67E8D5), style = MaterialTheme.typography.labelSmall)
+                            OutlinedTextField(value = prompt, onValueChange = { prompt = it },
+                                modifier = Modifier.fillMaxWidth(), placeholder = { Text("Message your assistant…") },
+                                minLines = 2, maxLines = 5, shape = RoundedCornerShape(16.dp))
+                        }
+                    }
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(), color = Color(0xFF101827),
+                        shape = RoundedCornerShape(18.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF26344A))
+                    ) {
+                        Column(Modifier.padding(horizontal = 8.dp, vertical = 5.dp)) {
+                            Text("QUICK TOOLS", Modifier.padding(start = 8.dp, top = 4.dp), color = Color(0xFF9EACC1), style = MaterialTheme.typography.labelSmall)
+                            FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         IconButton(onClick = { camera.launch(null) }) { Icon(Icons.Default.CameraAlt, "Camera", tint = Color.White) }
                         TextButton(enabled = PluginRegistry.isEnabled(this@MainActivity, "screen_context"), onClick = {
                             val manager = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
@@ -615,7 +699,10 @@ class MainActivity : ComponentActivity() {
                                 } finally { busy = false }
                             }
                         }) { Text("QUICK WEB") }
-                        Button(enabled = !busy, onClick = {
+                        Button(
+                            enabled = !busy, shape = RoundedCornerShape(14.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFB9A5FF), contentColor = Color(0xFF171329)),
+                            onClick = {
                             val text = prompt.trim()
                             if (text.isEmpty()) { status = "Write a message first."; return@Button }
                             messages.add(ChatMessage(text, true))
@@ -693,6 +780,8 @@ class MainActivity : ComponentActivity() {
                                 } finally { busy = false }
                             }
                         }) { Icon(Icons.Default.Send, "Send") }
+                            }
+                        }
                     }
                     if (pendingAction != null) {
                         Surface(color = Color(0xFF2A2638), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth()) {
@@ -729,7 +818,7 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                     }
-                    Text(status, color = Color(0xFFB0B0C2), style = MaterialTheme.typography.bodySmall)
+                    Text(status, color = Color(0xFF9EACC1), style = MaterialTheme.typography.bodySmall)
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         TextButton(onClick = {
                             messages.clear()
