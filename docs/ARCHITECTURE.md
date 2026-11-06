@@ -32,3 +32,8 @@ No accessibility permission is enabled automatically. The user grants it in Andr
 - Screen capture is one-shot and uses Android's MediaProjection consent dialog plus a foreground service notification. No persistent or silent screen recording is implemented.
 - Text document import is user-selected and capped at 120 KB. Imported text and captured media are sent only when the user presses Send.
 - Obsidian retrieval ranks sections by query keyword overlap; this is lightweight lexical retrieval, not embeddings or a semantic vector database.
+
+
+## Avatar renderer
+
+The app now includes an original procedural OpenGL ES 2.0 companion built from generated sphere meshes. It has subtle idle rotation, periodic blinking, and a mouth animation driven by Android TextToSpeech utterance callbacks. It does not load the uploaded PMX/MMD archive; that format needs a dedicated importer/conversion pipeline and each included character asset must be cleared for use first.
