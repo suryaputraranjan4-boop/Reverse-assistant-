@@ -2,46 +2,46 @@
 
 ## Runtime layers
 
-1. **Android shell** — Kotlin + Jetpack Compose. Owns lifecycle, settings, permissions and chat UI.
-2. **Provider router** — one request adapter per provider: Gemini, OpenAI, Claude, OpenRouter. The user selects the provider/model; keys remain local and encrypted with Android Keystore.
-3. **Vision input** — camera intent returns a user-selected photo. The same provider request can carry text plus image content. Live camera streaming is not part of this first milestone.
-4. **Voice** — Android speech-recognition intent for voice input and TextToSpeech for spoken output. Background always-on listening is intentionally not enabled.
-5. **Memory** — user-selected Obsidian vault via Storage Access Framework. Notes are Markdown in a dedicated Reverse Assistant folder. The user explicitly chooses what to save.
-6. **Touch controls** — optional AccessibilityService. The user must enable it in Settings. It supports app launching by a unique launcher-label match, semantic taps, double tap, bounded repeated tap, long press, swipe, scroll and drag. Gesture coordinates are normalized to the current display size.
-7. **Avatar** — isolated renderer boundary. A 3D PMX/MMD runtime and model import are a follow-on milestone; no restricted model assets are bundled.
+1. **Android shell and UI** — Kotlin + Jetpack Compose Material 3. Owns lifecycle, navigation surfaces, settings, permissions, and chat UI. The current visual system uses a dark navy palette with violet/teal accents, a provider card, companion panel, chat surface, and grouped composer tools.
+2. **Provider router** — request adapters for Gemini, OpenAI, Claude, and OpenRouter. Streaming uses provider-specific SSE endpoints. API keys remain local and are encrypted with Android Keystore.
+3. **Vision input** — camera photos and OS-consented MediaProjection frames can be attached to the next user-sent message. The screen service samples frames locally while active; it does not stream continuous video to the model.
+4. **Voice** — Android speech recognition for one-shot input and foreground dictation, TextToSpeech for output, and a foreground wake-phrase service. Wake phrases use the configured Android speech-recognition provider rather than a dedicated offline keyword model. Commands are placed in the composer and are not auto-submitted.
+5. **Memory** — user-selected Obsidian vault via Storage Access Framework. Notes are Markdown in a dedicated Reverse Assistant folder. The user explicitly chooses what to save; retrieval is lexical keyword ranking, not vector embeddings.
+6. **Touch controls** — optional AccessibilityService. The user must enable it in Settings. It supports allow-listed app launching and gestures. AI plans are capped at five actions and each action needs a separate confirmation.
+7. **Avatar** — original procedural OpenGL ES 2.0 renderer with idle movement, blinking, and TextToSpeech-linked mouth movement. PMX/MMD ZIP files can be safely extracted to app-private storage, but imported skeletal models are not rendered, rigged, or animated.
+8. **Built-in capabilities** — local toggles for web search, Obsidian, phone actions, and screen context. These are not external MCP/plugin-server connections.
 
 ## Current implementation
 
-- Provider text/image request adapters are present.
-- API key encryption and Obsidian note append are present.
-- Camera photo, voice transcription and TTS are wired into the UI.
-- Accessibility exposes screen text, unique app launching and a validated gesture allow-list. When an explicit phone-control request is detected, the AI can propose one action; the user must review and confirm it before dispatch.
-- GitHub Actions successfully completed a debug APK build and uploaded the artifact (workflow run 42193647302). This verifies compilation and packaging in CI, not runtime behavior on a physical phone.
-- Screen text is now collected and sent to the selected AI provider only when the user message is detected as an explicit phone-control request. Phone actions remain allow-listed and require a separate confirmation tap.
-- Physical-device testing, provider-by-provider live API tests, persistent chat history, multi-step app navigation, and the 3D avatar renderer remain unfinished.
+- Chat history, transcript export, backup/restore, provider/model preferences, encrypted API-key storage, and assistant style preferences.
+- Provider streaming adapters and one-shot image input for supported providers. Provider-specific live compatibility still needs broader validation.
+- Ranked DuckDuckGo HTML search with source links; subject to network availability and rate limits.
+- Bounded TXT/Markdown/CSV/JSON/PDF/DOCX extraction. PDF import is capped at 20 MB, 30 pages, and 120,000 output characters. Scanned PDFs are not OCR'd.
+- MediaProjection screen sampling with explicit OS consent, foreground notification, and Stop action. Latest frame is attached only to the next message the user sends.
+- Wake phrase service with explicit start/stop and persistent notification. Recognition may rely on Android's speech provider/network.
+- Accessibility actions are allow-listed, user-requested, and individually confirmed. Failed or cancelled steps stop the remaining plan.
+- GitHub Actions builds and unit tests are the current automated validation. Physical-device testing and provider credential/API tests are not performed by CI.
+
+## Known incomplete work
+
+- Imported PMX/MMD rendering, skeletal rigging, animation retargeting, and imported-model lip sync.
+- Direct live screen-video streaming to an AI provider.
+- Dedicated offline wake-word detection and offline LLM runtime/model management.
+- Scanned-PDF OCR.
+- External MCP/plugin server adapters and user-configurable third-party connectors.
+- Broad provider compatibility and physical-device testing.
 
 ## Safety and consent
 
-No accessibility permission is enabled automatically. The user grants it in Android Settings and can revoke it at any time. Camera and voice actions are initiated by visible buttons. Obsidian writes happen only after the user presses Save Memory. API keys are not sent to the repository.
-
-
-## Current incremental capabilities
-
-- Streaming responses use provider-specific SSE endpoints. Gemini uses `streamGenerateContent?alt=sse`, OpenAI-compatible providers use `stream: true`, and Claude uses its Messages streaming flag.
-- Continuous dictation is user-started, foreground-only, and stops when the Activity pauses. It places recognized text in the composer; the user still chooses when to send it.
-- Screen capture is one-shot and uses Android's MediaProjection consent dialog plus a foreground service notification. No persistent or silent screen recording is implemented.
-- Text document import is user-selected and capped at 120 KB. Imported text and captured media are sent only when the user presses Send.
-- Obsidian retrieval ranks sections by query keyword overlap; this is lightweight lexical retrieval, not embeddings or a semantic vector database.
-
+No accessibility permission is enabled automatically. The user grants it in Android Settings and can revoke it at any time. Camera, microphone, and screen capture are initiated through visible controls and OS permission flows. Wake-word and screen-capture foreground services show persistent notifications and explicit Stop actions. Obsidian writes happen only after user action. API keys are not committed to the repository.
 
 ## Avatar renderer
 
-The app now includes an original procedural OpenGL ES 2.0 companion built from generated sphere meshes. It has subtle idle rotation, periodic blinking, and a mouth animation driven by Android TextToSpeech utterance callbacks. It does not load the uploaded PMX/MMD archive; that format needs a dedicated importer/conversion pipeline and each included character asset must be cleared for use first.
-
+The app includes an original procedural OpenGL ES 2.0 companion built from generated sphere meshes. It has subtle idle rotation, periodic blinking, and mouth animation driven by Android TextToSpeech utterance callbacks. It does not load PMX/MMD packages; that format needs a dedicated runtime/conversion pipeline and model assets cleared for use.
 
 ## Document import
 
 - TXT/Markdown/CSV/JSON import is capped at 1.5 MB raw input.
 - PDF text extraction uses PDFBox-Android, caps files at 20 MB and extraction at 30 pages / 120,000 characters. Image-only/scanned pages are not OCR'd.
 - DOCX extraction reads the main WordprocessingML document text; embedded objects, comments, tracked changes, and complex layout are not preserved.
-- Parsing runs on an IO dispatcher. The selected document text is included only in the next message sent by the user.
+- Parsing runs on an IO dispatcher. Selected document text is included only in the next message sent by the user.
