@@ -365,6 +365,7 @@ class MainActivity : ComponentActivity() {
                                 if (geminiLiveSession === session) geminiLiveSession = null
                                 continuousScreen = false
                                 liveAiVideo = false
+                                liveAiVideoRequested = false
                                 status = "Live AI video sharing stopped."
                             }
                         }
@@ -808,9 +809,17 @@ class MainActivity : ComponentActivity() {
                                         }
                                     )
                                     geminiLiveSession = session
-                                    session.start()
-                                    val manager = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
-                                    screenCapture.launch(manager.createScreenCaptureIntent())
+                                    try {
+                                        session.start()
+                                        val manager = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+                                        screenCapture.launch(manager.createScreenCaptureIntent())
+                                    } catch (error: Exception) {
+                                        session.close()
+                                        geminiLiveSession = null
+                                        liveAiVideoRequested = false
+                                        continuousScreenRequested = false
+                                        status = error.message ?: "Could not start Gemini Live video."
+                                    }
                                 }
                             }
                         }) { Text(if (liveAiVideo || liveAiVideoRequested) "STOP LIVE AI VIDEO" else "LIVE AI VIDEO") }
