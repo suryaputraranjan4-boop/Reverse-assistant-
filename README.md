@@ -15,7 +15,7 @@ Android-first personal AI companion built with Kotlin, Jetpack Compose, Material
 - Obsidian vault integration through Android's Storage Access Framework; notes are saved only after user action.
 - Optional Android AccessibilityService for allow-listed phone gestures and app launching. AI-proposed plans are limited to five actions and require individual confirmation.
 - Local capability switches for web search, Obsidian, phone actions, and screen context.
-- PMX/MMD ZIP archive import into app-private storage with bounded extraction and path traversal checks. Imported models are catalogued but are not yet rendered, rigged, or animated.
+- PMX/MMD ZIP archive import into app-private storage with bounded extraction and path traversal checks. Assimp's MMD importer now loads static triangle meshes into the companion preview with per-material diffuse colors; skeletal posing, VMD animation, physics, and texture maps remain incomplete.
 - External MCP Streamable HTTP server manager: save trusted HTTPS endpoints, encrypt bearer tokens, discover tools, and call a selected tool only after a direct Run action.
 - Optional on-device GGUF inference through the llama.cpp Android native runtime (arm64-v8a); the user imports model weights locally.
 - Gemini Live screen-video session: after Android MediaProjection consent, sends downscaled JPEG screen frames to Gemini Live at approximately 1 FPS and routes user text prompts through the same session.
@@ -23,7 +23,7 @@ Android-first personal AI companion built with Kotlin, Jetpack Compose, Material
 ## Feature boundaries — read before testing
 
 The following are **not complete**:
-- PMX/MMD model rendering, skeletal rigging, VMD animation playback, physics, and lip sync for imported characters.
+- PMX/MMD skeletal rigging, bone/morph animation, VMD motion playback, physics, and imported texture-map rendering. The current preview renders static geometry and diffuse material colors.
 - Live screen video with providers other than Gemini Live. Gemini Live consumes discrete JPEG frames (about 1 FPS), not a high-frame-rate raw video stream; a Gemini API key and internet connection are required.
 - A dedicated low-power keyword-spotting model. Offline Vosk speech recognition can match wake phrases after the user imports a compatible model, but it is not a specialized always-on KWS model.
 - Automatic MCP tool selection or unattended tool execution. Users manually choose the server and tool, inspect arguments, and tap Run.
