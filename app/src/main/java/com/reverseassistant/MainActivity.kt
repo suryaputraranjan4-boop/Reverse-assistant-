@@ -161,7 +161,7 @@ class MainActivity : ComponentActivity() {
                                     messages.add(ChatMessage(reply, false))
                                     lastReply = reply
                                     status = "Ready"
-                                    tts?.speak(reply, TextToSpeech.QUEUE_FLUSH, null, "assistant-reply")
+                                    tts?.speak(reply, TextToSpeech.QUEUE_FLUSH, Bundle(), "assistant-reply")
                                 } catch (e: Exception) {
                                     val error = e.message ?: "Request failed."
                                     messages.add(ChatMessage(error, false)); status = error
