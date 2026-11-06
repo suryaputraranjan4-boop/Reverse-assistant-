@@ -256,6 +256,7 @@ class MainActivity : ComponentActivity() {
         var speechPitch by remember { mutableFloatStateOf(settingsPrefs.getFloat("speech_pitch", 1.0f).coerceIn(0.7f, 1.4f)) }
         var attachedDocument by remember { mutableStateOf("") }
         var attachedDocumentName by remember { mutableStateOf("") }
+        var importedModelStatus by remember { mutableStateOf("") }
         var prompt by remember { mutableStateOf("") }
         var apiKey by remember { mutableStateOf("") }
         var showSettings by remember { mutableStateOf(false) }
@@ -420,7 +421,23 @@ class MainActivity : ComponentActivity() {
                 } catch (e: Exception) { status = e.message ?: "Could not restore backup." }
             }
         }
-        val diagnosticsExport = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
+        val modelPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            if (uri != null) {
+                scope.launch {
+                    try {
+                        status = "Importing model package to private app storage…"
+                        val imported = withContext(Dispatchers.IO) {
+                            ModelPackageImporter.import(this@MainActivity, uri)
+                        }
+                        importedModelStatus = imported.summary
+                        status = "Model assets imported locally (${imported.summary}). The current avatar renderer still uses its built-in procedural model; PMX skeletal rendering is not connected yet."
+                    } catch (e: Exception) {
+                        status = e.message ?: "Could not import the model package."
+                    }
+                }
+            }
+        }
+                val diagnosticsExport = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
             if (uri != null) {
                 try {
                     contentResolver.openOutputStream(uri)?.use {
@@ -473,6 +490,7 @@ class MainActivity : ComponentActivity() {
                     }
                     Spacer(Modifier.height(8.dp))
                     Text("3D COMPANION", color = Color(0xFFB7A1FF), style = MaterialTheme.typography.labelMedium)
+                    if (importedModelStatus.isNotBlank()) Text("Imported assets: $importedModelStatus", color = Color(0xFF80CBC4), style = MaterialTheme.typography.bodySmall)
                     AndroidView(
                         factory = { context -> Avatar3DView(context).also { avatarView = it } },
                         update = { view -> view.setSpeaking(avatarSpeaking) },
@@ -510,6 +528,7 @@ class MainActivity : ComponentActivity() {
                                 screenCapture.launch(manager.createScreenCaptureIntent())
                             }
                         }) { Text(if (continuousScreen) "STOP LIVE SCREEN" else "LIVE SCREEN") }
+                        TextButton(onClick = { modelPicker.launch(arrayOf("application/zip", "application/x-zip-compressed", "application/octet-stream")) }) { Text("IMPORT 3D MODEL") }
                         TextButton(onClick = { documentPicker.launch(arrayOf("text/plain", "text/markdown", "text/csv", "application/json", "application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")) }) { Text("FILE") }
                         TextButton(onClick = { exportChat.launch("reverse-assistant-chat.txt") }) { Text("EXPORT CHAT") }
                         TextButton(onClick = { backupExport.launch("reverse-assistant-backup.json") }) { Text("BACKUP") }
