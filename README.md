@@ -14,12 +14,12 @@ Android-first personal AI assistant. This repository is the clean implementation
 - Persist provider/model and speech preferences; toggle spoken replies, adjust speech rate/pitch, and stop current speech.
 - Obsidian vault integration for durable Markdown memory, with query-keyword relevance retrieval.
 - Optional Android AccessibilityService for explicit, user-authorized app launching by unique app label, taps, double taps, repeated taps, long presses, swipes, and vertical scrolling. Drag is available as a confirmed AI action.
-- 3D avatar interface as a separate renderer module; character assets are imported locally unless redistribution rights are confirmed.
+- Original procedural OpenGL ES 3D companion with idle movement, blinking, and speech-synchronized mouth animation. Third-party PMX/MMD character import remains separate and license-gated.
 - API credentials encrypted with Android Keystore and never committed to Git.
 
 ## Status
 
-Chat history persistence and the AI drag action have now been added. Implemented in this branch: streaming text responses for Gemini/OpenAI/Claude/OpenRouter, foreground continuous dictation (no wake word), one-shot OS-consented screen capture, user-selected TXT/Markdown/CSV/JSON import, chat export, speech controls, and keyword-ranked Obsidian memory retrieval. Still pending: true 3D renderer/lip-sync, continuous live screen streaming, multi-step device orchestration, PDF/DOCX extraction, integrated web search, plugin integrations, robust provider compatibility tests, and real-device validation.
+Chat history persistence and the AI drag action have now been added. Implemented in this branch: streaming text responses for Gemini/OpenAI/Claude/OpenRouter, foreground continuous dictation (no wake word), one-shot OS-consented screen capture, user-selected TXT/Markdown/CSV/JSON import, chat export, speech controls, and keyword-ranked Obsidian memory retrieval. Still pending: importing the user-supplied PMX/MMD character model and a full skeletal rig, continuous live screen streaming, multi-step device orchestration, PDF/DOCX extraction, integrated web search, plugin integrations, robust provider compatibility tests, and real-device validation.
 
 The Android project currently builds successfully in GitHub Actions and uploads a debug APK artifact (workflow run 42193647302). This is a verified CI build, not proof of production readiness or physical-device compatibility. Provider calls require the user's own API keys and may incur provider charges. Physical-device testing and several advanced modules are still pending.
 
