@@ -3,6 +3,7 @@ package com.reverseassistant
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
@@ -26,7 +27,10 @@ class ScreenCaptureService : Service() {
     companion object {
         const val EXTRA_RESULT_CODE = "projection_result_code"
         const val EXTRA_DATA = "projection_data"
+        const val EXTRA_CONTINUOUS = "projection_continuous"
+        const val ACTION_STOP = "com.reverseassistant.STOP_SCREEN_SHARE"
         @Volatile var onScreenshot: ((ByteArray?) -> Unit)? = null
+        @Volatile var onFrame: ((ByteArray) -> Unit)? = null
         private const val CHANNEL_ID = "screen_capture"
         private const val NOTIFICATION_ID = 72
     }
@@ -37,6 +41,8 @@ class ScreenCaptureService : Service() {
     private var display: VirtualDisplay? = null
     private var captured = false
     private var finished = false
+    private var continuous = false
+    private var lastFrameAt = 0L
     private val projectionCallback = object : MediaProjection.Callback() {
         override fun onStop() {
             if (!finished) finishCapture(null)
@@ -46,12 +52,24 @@ class ScreenCaptureService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == ACTION_STOP) {
+            onFrame = null
+            onScreenshot = null
+            stopSelf()
+            return START_NOT_STICKY
+        }
+        continuous = intent?.getBooleanExtra(EXTRA_CONTINUOUS, false) == true
         createNotificationChannel()
+        val stopIntent = Intent(this, ScreenCaptureService::class.java).setAction(ACTION_STOP)
+        val stopPendingIntent = PendingIntent.getService(
+            this, 73, stopIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
         val notification = Notification.Builder(this, CHANNEL_ID)
             .setContentTitle("Reverse Assistant")
-            .setContentText("Capturing the screen you approved…")
+            .setContentText(if (continuous) "Live screen sharing is active. Tap Stop to end." else "Capturing the screen you approved…")
             .setSmallIcon(android.R.drawable.ic_menu_camera)
             .setOngoing(true)
+            .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Stop sharing", stopPendingIntent)
             .build()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             startForeground(NOTIFICATION_ID, notification, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION)
@@ -84,7 +102,8 @@ class ScreenCaptureService : Service() {
             reader?.setOnImageAvailableListener({ source ->
                 val frame = source.acquireLatestImage() ?: return@setOnImageAvailableListener
                 try {
-                    if (!captured) {
+                    val now = android.os.SystemClock.elapsedRealtime()
+                    if (!captured || (continuous && now - lastFrameAt >= 1500L)) {
                         val plane = frame.planes[0]
                         val pixelStride = plane.pixelStride
                         val rowPadding = plane.rowStride - pixelStride * width
@@ -98,7 +117,9 @@ class ScreenCaptureService : Service() {
                         padded.recycle()
                         bitmap.recycle()
                         captured = true
-                        finishCapture(output.toByteArray())
+                        lastFrameAt = now
+                        val bytes = output.toByteArray()
+                        if (continuous) onFrame?.invoke(bytes) else finishCapture(bytes)
                     }
                 } catch (_: Exception) {
                     finishCapture(null)
@@ -111,9 +132,11 @@ class ScreenCaptureService : Service() {
                 DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
                 reader?.surface, null, handler
             )
-            handler.postDelayed({
-                if (!captured) finishCapture(null)
-            }, 6000)
+            if (!continuous) {
+                handler.postDelayed({
+                    if (!captured) finishCapture(null)
+                }, 6000)
+            }
         } catch (_: Exception) {
             finishCapture(null)
         }
@@ -125,6 +148,7 @@ class ScreenCaptureService : Service() {
         finished = true
         onScreenshot?.invoke(bytes)
         onScreenshot = null
+        onFrame = null
         stopSelf()
     }
 
