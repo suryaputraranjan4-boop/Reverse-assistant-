@@ -21,7 +21,7 @@ class TouchControlService : AccessibilityService() {
         val root = rootInActiveWindow ?: return "No accessible screen is currently available."
         val lines = mutableListOf<String>()
         collectText(root, lines, maxItems.coerceIn(1, 80))
-        return lines.joinToString("\\n").ifBlank { "The current screen exposes no readable text." }
+        return lines.joinToString("\n").ifBlank { "The current screen exposes no readable text." }
     }
 
     private fun collectText(node: android.view.accessibility.AccessibilityNodeInfo?, out: MutableList<String>, limit: Int) {
