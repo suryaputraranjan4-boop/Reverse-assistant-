@@ -50,12 +50,13 @@ object ObsidianVault {
             val terms = query.lowercase(Locale.ROOT).split(Regex("[^\\p{L}\\p{N}]+"))
                 .filter { it.length >= 3 }.toSet()
             if (terms.isEmpty()) return all.takeLast(maxChars)
-            val sections = all.split(Regex("(?m)(?=^## )")).filter { it.isNotBlank() }
-            val ranked = sections.mapIndexed { index, section ->
-                val text = section.lowercase(Locale.ROOT)
-                val score = terms.sumOf { term -> if (text.contains(term)) 1 else 0 }
+            val sections: List<String> = all.split(Regex("(?m)(?=^## )")).filter { section -> section.isNotBlank() }
+            val ranked: List<Triple<Int, Int, String>> = sections.mapIndexed { index: Int, section: String ->
+                val lowered = section.lowercase(Locale.ROOT)
+                val score: Int = terms.count { term: String -> lowered.contains(term) }
                 Triple(index, score, section)
-            }.filter { it.second > 0 }.sortedWith(compareByDescending<Triple<Int, Int, String>> { it.second }.thenByDescending { it.first })
+            }.filter { item -> item.second > 0 }
+                .sortedWith(compareByDescending<Triple<Int, Int, String>> { item -> item.second }.thenByDescending { item -> item.first })
             val selected = ranked.take(6).sortedBy { it.first }.joinToString("\n\n") { it.third }
             (if (selected.isBlank()) all.takeLast(maxChars) else selected).takeLast(maxChars)
         } catch (_: Exception) { "" }
