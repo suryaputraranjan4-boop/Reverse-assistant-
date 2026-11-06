@@ -21,6 +21,7 @@ data class PhoneAction(
         "long_press" -> "Long press at screen position"
         "repeat_tap" -> "Tap repeatedly ($count times)"
         "swipe" -> "Swipe across the screen"
+        "drag" -> "Drag across the screen"
         "scroll_up" -> "Scroll up"
         "scroll_down" -> "Scroll down"
         else -> "Unsupported action"
@@ -34,6 +35,7 @@ data class PhoneAction(
         "long_press" -> service.longPress(x, y, durationMs)
         "repeat_tap" -> service.repeatedTap(x, y, count)
         "swipe" -> service.swipe(x, y, x2, y2, durationMs)
+        "drag" -> service.drag(x, y, x2, y2, durationMs)
         "scroll_up" -> service.scrollUp()
         "scroll_down" -> service.scrollDown()
         else -> false
@@ -48,7 +50,7 @@ data class PhoneAction(
                 val root = JSONObject(response.substring(start, end + 1))
                 val obj = root.optJSONObject("phone_action") ?: root
                 val type = obj.optString("type", obj.optString("action")).lowercase()
-                if (type !in setOf("tap_text", "launch_app", "tap", "double_tap", "long_press", "repeat_tap", "swipe", "scroll_up", "scroll_down")) return null
+                if (type !in setOf("tap_text", "launch_app", "tap", "double_tap", "long_press", "repeat_tap", "swipe", "drag", "scroll_up", "scroll_down")) return null
                 val target = obj.optString("target")
                 if ((type == "tap_text" || type == "launch_app") && target.isBlank()) return null
                 fun coord(name: String, fallback: Double) = obj.optDouble(name, fallback).toFloat().coerceIn(0f, 1f)
