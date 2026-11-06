@@ -255,6 +255,8 @@ class MainActivity : ComponentActivity() {
                             val text = prompt.trim()
                             if (text.isEmpty()) { status = "Write a message first."; return@Button }
                             messages.add(ChatMessage(text, true))
+                            val assistantMessageIndex = messages.size
+                            messages.add(ChatMessage("Connecting to AI…", false))
                             prompt = ""
                             busy = true
                             status = "Thinking with ${provider.label}…"
@@ -264,7 +266,7 @@ class MainActivity : ComponentActivity() {
                             scope.launch {
                                 try {
                                     val savedMemory = ObsidianVault.readMemory(this@MainActivity)
-                                    val recentChat = messages.takeLast(12).joinToString("\n") {
+                                    val recentChat = messages.dropLast(1).takeLast(12).joinToString("\n") {
                                         (if (it.fromUser) "User: " else "Assistant: ") + it.text
                                     }
                                     val memorySection = if (savedMemory.isBlank()) "" else
@@ -297,23 +299,30 @@ class MainActivity : ComponentActivity() {
                                         attachedDocument.take(120000) + "\n\n"
                                     val contextPrompt = memorySection + documentSection + actionGuide +
                                         "\n\nVisible Android screen context (only if explicitly requested):\n$screenContext\n\nRecent conversation:\n$recentChat\n\nRespond to the latest user message."
-                                    val reply = AiClient().ask(provider, model, key, contextPrompt, photo)
+                                    val reply = AiClient().askStreaming(provider, model, key, contextPrompt, photo) { delta ->
+                                        if (!requestsPhoneControl && assistantMessageIndex in messages.indices) {
+                                            messages[assistantMessageIndex] = ChatMessage(
+                                                messages[assistantMessageIndex].text + delta, false
+                                            )
+                                        }
+                                    }
                                     attachedDocument = ""
                                     attachedDocumentName = ""
                                     val proposedAction = if (requestsPhoneControl) PhoneAction.parse(reply) else null
                                     if (proposedAction != null) {
                                         pendingAction = proposedAction
-                                        messages.add(ChatMessage("I prepared a phone action. Review the confirmation card below before it runs.", false))
+                                        messages[assistantMessageIndex] = ChatMessage("I prepared a phone action. Review the confirmation card below before it runs.", false)
                                         lastReply = "Proposed action: ${proposedAction.description}"
                                     } else {
-                                        messages.add(ChatMessage(reply, false))
+                                        messages[assistantMessageIndex] = ChatMessage(reply, false)
                                         lastReply = reply
                                         if (speakReplies) tts?.speak(reply, TextToSpeech.QUEUE_FLUSH, Bundle(), "assistant-reply")
                                     }
                                     status = "Ready"
                                 } catch (e: Exception) {
                                     val error = e.message ?: "Request failed."
-                                    messages.add(ChatMessage(error, false)); status = error
+                                    if (assistantMessageIndex in messages.indices) messages[assistantMessageIndex] = ChatMessage(error, false)
+                                    status = error
                                 } finally { busy = false }
                             }
                         }) { Icon(Icons.Default.Send, "Send") }
