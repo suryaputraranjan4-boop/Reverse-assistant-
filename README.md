@@ -9,6 +9,9 @@ Android-first personal AI assistant. This repository is the clean implementation
 - Camera capture for user-requested image/scene analysis.
 - Voice input and spoken replies using Android speech services.
 - Local chat history persisted on-device (latest 120 messages), with a clear-chat control.
+- Import user-selected TXT, Markdown, CSV, or JSON text documents (bounded to 120 KB) into the next prompt; the UI discloses that the attached text is sent to the selected AI provider.
+- Export chat transcripts as plain text.
+- Persist provider/model and speech preferences; toggle spoken replies, adjust speech rate/pitch, and stop current speech.
 - Obsidian vault integration for durable Markdown memory.
 - Optional Android AccessibilityService for explicit, user-authorized app launching by unique app label, taps, double taps, repeated taps, long presses, swipes, and vertical scrolling. Drag is available as a confirmed AI action.
 - 3D avatar interface as a separate renderer module; character assets are imported locally unless redistribution rights are confirmed.
@@ -16,7 +19,7 @@ Android-first personal AI assistant. This repository is the clean implementation
 
 ## Status
 
-Chat history persistence and the AI drag action have now been added. The remaining live voice, avatar renderer, screen-sharing, streaming, and multi-step orchestration work is still pending.
+Chat history persistence and the AI drag action have now been added. Live wake-word listening, avatar rendering/lip-sync, live screen-sharing, token streaming, multi-step orchestration, PDF/DOCX extraction, web search, plugin integrations, and real-device validation remain pending.
 
 The Android project currently builds successfully in GitHub Actions and uploads a debug APK artifact (workflow run 42193647302). This is a verified CI build, not proof of production readiness or physical-device compatibility. Provider calls require the user's own API keys and may incur provider charges. Physical-device testing and several advanced modules are still pending.
 
