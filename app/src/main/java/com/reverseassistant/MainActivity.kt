@@ -33,8 +33,35 @@ import com.reverseassistant.touch.TouchControlService
 import java.io.ByteArrayOutputStream
 import java.util.Locale
 import kotlinx.coroutines.launch
+import org.json.JSONArray
+import org.json.JSONObject
 
 data class ChatMessage(val text: String, val fromUser: Boolean)
+
+private const val CHAT_HISTORY_PREFS = "reverse_assistant_chat"
+private const val CHAT_HISTORY_KEY = "messages"
+
+private fun loadChatHistory(context: android.content.Context): List<ChatMessage> {
+    return try {
+        val raw = context.getSharedPreferences(CHAT_HISTORY_PREFS, android.content.Context.MODE_PRIVATE)
+            .getString(CHAT_HISTORY_KEY, "[]") ?: "[]"
+        val array = JSONArray(raw)
+        (0 until array.length()).mapNotNull { index ->
+            val item = array.optJSONObject(index) ?: return@mapNotNull null
+            val text = item.optString("text")
+            if (text.isBlank()) null else ChatMessage(text, item.optBoolean("fromUser"))
+        }.takeLast(120)
+    } catch (_: Exception) { emptyList() }
+}
+
+private fun saveChatHistory(context: android.content.Context, messages: List<ChatMessage>) {
+    val array = JSONArray()
+    messages.takeLast(120).forEach { message ->
+        array.put(JSONObject().put("text", message.text).put("fromUser", message.fromUser))
+    }
+    context.getSharedPreferences(CHAT_HISTORY_PREFS, android.content.Context.MODE_PRIVATE)
+        .edit().putString(CHAT_HISTORY_KEY, array.toString()).apply()
+}
 
 private fun isExplicitPhoneControlRequest(message: String): Boolean {
     val text = message.lowercase(Locale.ROOT)
@@ -81,7 +108,12 @@ class MainActivity : ComponentActivity() {
         var busy by remember { mutableStateOf(false) }
         var lastReply by remember { mutableStateOf("") }
         var pendingAction by remember { mutableStateOf<PhoneAction?>(null) }
-        val messages = remember { mutableStateListOf<ChatMessage>() }
+        val messages = remember {
+            mutableStateListOf<ChatMessage>().apply { addAll(loadChatHistory(this@MainActivity)) }
+        }
+        LaunchedEffect(messages.size) {
+            saveChatHistory(this@MainActivity, messages.toList())
+        }
 
         val camera = rememberLauncherForActivityResult(ActivityResultContracts.TakePicturePreview()) { bitmap ->
             if (bitmap != null) {
@@ -197,10 +229,10 @@ class MainActivity : ComponentActivity() {
                                         The user explicitly requested phone control. If one safe, clear action is
                                         appropriate, return exactly one JSON object and no other text:
                                         {"phone_action":{"type":"tap_text","target":"visible label"}}
-                                        Allowed types: launch_app, tap_text, tap, double_tap, long_press, repeat_tap, swipe, scroll_up, scroll_down.
+                                        Allowed types: launch_app, tap_text, tap, double_tap, long_press, repeat_tap, swipe, drag, scroll_up, scroll_down.
                                         For launch_app, target must be the exact visible app name.
                                         Coordinate fields x,y,x2,y2 must be normalized from 0.0 to 1.0.
-                                        For repeat_tap use count 1..10. For long_press/swipe use duration_ms.
+                                        For repeat_tap use count 1..10. For long_press/swipe/drag use duration_ms.
                                         Do not guess targets or perform sensitive actions. If uncertain, ask a question
                                         in normal text instead. The app requires the user to review and confirm the action.
                                     """.trimIndent() else """
@@ -253,6 +285,12 @@ class MainActivity : ComponentActivity() {
                     }
                     Text(status, color = Color(0xFFB0B0C2), style = MaterialTheme.typography.bodySmall)
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        TextButton(onClick = {
+                            messages.clear()
+                            lastReply = ""
+                            pendingAction = null
+                            status = "Chat history cleared on this device."
+                        }) { Text("CLEAR CHAT") }
                         TextButton(onClick = { vaultPicker.launch(null) }) { Text("CONNECT OBSIDIAN") }
                         TextButton(onClick = { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }) { Text("ENABLE TOUCH CONTROLS") }
                     }
