@@ -138,9 +138,10 @@ class MainActivity : ComponentActivity() {
                     override fun onError(error: Int) {
                         if (!continuousListening) return
                         if (error == SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS) {
+                            val stateCallback = listeningStateCallback
                             speechStatusCallback?.invoke("Microphone permission is missing.")
                             stopContinuousListening()
-                            listeningStateCallback?.invoke(false)
+                            stateCallback?.invoke(false)
                         } else {
                             scheduleSpeechRestart()
                         }
