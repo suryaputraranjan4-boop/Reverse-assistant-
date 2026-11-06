@@ -9,7 +9,7 @@ Android-first personal AI assistant. This repository is the clean implementation
 - Camera capture for user-requested image/scene analysis.
 - Voice input and spoken replies using Android speech services.
 - Obsidian vault integration for durable Markdown memory.
-- Optional Android AccessibilityService for explicit, user-authorized taps, double taps, repeated taps, long presses, swipes, drags, and vertical scrolling.
+- Optional Android AccessibilityService for explicit, user-authorized app launching by unique app label, taps, double taps, repeated taps, long presses, swipes, drags, and vertical scrolling.
 - 3D avatar interface as a separate renderer module; character assets are imported locally unless redistribution rights are confirmed.
 - API credentials encrypted with Android Keystore and never committed to Git.
 
