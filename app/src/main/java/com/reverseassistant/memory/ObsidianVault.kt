@@ -22,6 +22,19 @@ object ObsidianVault {
     fun hasVault(context: Context) =
         !context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(TREE, null).isNullOrBlank()
 
+    fun readMemory(context: Context, maxChars: Int = 12000): String {
+        val raw = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(TREE, null)
+            ?: return ""
+        return try {
+            val root = DocumentFile.fromTreeUri(context, Uri.parse(raw)) ?: return ""
+            val folder = root.findFile("Reverse Assistant") ?: return ""
+            val file = folder.findFile("Assistant Memory.md") ?: return ""
+            context.contentResolver.openInputStream(file.uri)?.bufferedReader(Charsets.UTF_8)?.use {
+                it.readText().takeLast(maxChars)
+            }.orEmpty()
+        } catch (_: Exception) { "" }
+    }
+
     fun appendMemory(context: Context, title: String, content: String): String {
         val raw = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(TREE, null)
             ?: error("Choose your Obsidian vault first.")
