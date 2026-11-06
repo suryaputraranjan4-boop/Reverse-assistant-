@@ -2,6 +2,7 @@ package com.reverseassistant
 
 import android.content.Context
 import android.net.Uri
+import android.provider.OpenableColumns
 import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
 import com.tom_roush.pdfbox.pdmodel.PDDocument
 import com.tom_roush.pdfbox.text.PDFTextStripper
@@ -14,6 +15,7 @@ import java.util.zip.ZipInputStream
 object DocumentTextExtractor {
     private const val MAX_CHARS = 120_000
     private const val MAX_BYTES = 1_500_000
+    private const val MAX_PDF_BYTES = 20_000_000L
 
     fun displayName(uri: Uri): String =
         uri.lastPathSegment?.substringAfterLast(':')?.substringAfterLast('/')?.take(80)
@@ -47,6 +49,10 @@ object DocumentTextExtractor {
     }
 
     private fun extractPdf(context: Context, uri: Uri): String {
+        val size = context.contentResolver.query(uri, arrayOf(OpenableColumns.SIZE), null, null, null)?.use { cursor ->
+            if (cursor.moveToFirst() && !cursor.isNull(0)) cursor.getLong(0) else null
+        }
+        require(size == null || size <= MAX_PDF_BYTES) { "PDF is larger than the 20 MB import limit." }
         PDFBoxResourceLoader.init(context.applicationContext)
         val input = context.contentResolver.openInputStream(uri) ?: error("Could not open this PDF.")
         input.use { stream ->
