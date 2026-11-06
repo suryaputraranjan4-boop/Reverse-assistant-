@@ -3,12 +3,10 @@ package com.reverseassistant.ai
 import android.util.Base64
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.Dispatchers
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import okio.BufferedSource
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
@@ -139,7 +137,6 @@ class AiClient {
             .put(JSONObject().put("type", "image_url").put("image_url", JSONObject().put("url", "data:image/jpeg;base64,$image64")))
         val body = JSONObject().put("model", model)
             .put("messages", JSONArray().put(JSONObject().put("role", "user").put("content", content)))
-        if (streaming) body.put("stream", true)
             .put("temperature", 0.7)
         if (streaming) body.put("stream", true)
         val builder = Request.Builder().url(url).header("Authorization", "Bearer $key")
@@ -155,6 +152,7 @@ class AiClient {
             .put("source", JSONObject().put("type", "base64").put("media_type", "image/jpeg").put("data", image64)))
         val body = JSONObject().put("model", model).put("max_tokens", 2048)
             .put("messages", JSONArray().put(JSONObject().put("role", "user").put("content", content)))
+        if (streaming) body.put("stream", true)
         return Request.Builder().url("https://api.anthropic.com/v1/messages")
             .header("x-api-key", key).header("anthropic-version", "2023-06-01")
             .post(body.toString().toRequestBody("application/json".toMediaType())).build()
