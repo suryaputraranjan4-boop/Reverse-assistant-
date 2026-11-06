@@ -104,7 +104,7 @@ class ScreenCaptureService : Service() {
                 val frame = source.acquireLatestImage() ?: return@setOnImageAvailableListener
                 try {
                     val now = android.os.SystemClock.elapsedRealtime()
-                    if (!captured || (continuous && now - lastFrameAt >= 1500L)) {
+                    if (!captured || (continuous && now - lastFrameAt >= 1000L)) {
                         val plane = frame.planes[0]
                         val pixelStride = plane.pixelStride
                         val rowPadding = plane.rowStride - pixelStride * width
@@ -114,7 +114,18 @@ class ScreenCaptureService : Service() {
                         padded.copyPixelsFromBuffer(plane.buffer)
                         val bitmap = Bitmap.createBitmap(padded, 0, 0, width, height)
                         val output = ByteArrayOutputStream()
-                        bitmap.compress(Bitmap.CompressFormat.JPEG, 82, output)
+                        val maxDimension = maxOf(bitmap.width, bitmap.height)
+                        val streamBitmap = if (continuous && maxDimension > 768) {
+                            val scale = 768f / maxDimension.toFloat()
+                            Bitmap.createScaledBitmap(
+                                bitmap,
+                                (bitmap.width * scale).toInt().coerceAtLeast(1),
+                                (bitmap.height * scale).toInt().coerceAtLeast(1),
+                                true
+                            )
+                        } else bitmap
+                        streamBitmap.compress(Bitmap.CompressFormat.JPEG, 78, output)
+                        if (streamBitmap !== bitmap) streamBitmap.recycle()
                         padded.recycle()
                         bitmap.recycle()
                         captured = true

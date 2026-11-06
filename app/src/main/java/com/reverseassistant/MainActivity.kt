@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.reverseassistant.ai.AiClient
 import com.reverseassistant.ai.AiProvider
+import com.reverseassistant.ai.GeminiLiveVideoSession
 import com.reverseassistant.mcp.McpServerDialog
 import com.reverseassistant.local.OfflineLlmManager
 import com.reverseassistant.local.OfflineModelStore
@@ -260,6 +261,9 @@ class MainActivity : ComponentActivity() {
         var wakeWordActive by remember { mutableStateOf(WakeWordService.active) }
         var continuousScreen by remember { mutableStateOf(false) }
         var continuousScreenRequested by remember { mutableStateOf(false) }
+        var liveAiVideoRequested by remember { mutableStateOf(false) }
+        var liveAiVideo by remember { mutableStateOf(false) }
+        var geminiLiveSession by remember { mutableStateOf<GeminiLiveVideoSession?>(null) }
         var avatarSpeaking by remember { mutableStateOf(false) }
         var speechRate by remember { mutableFloatStateOf(settingsPrefs.getFloat("speech_rate", 1.0f).coerceIn(0.6f, 1.5f)) }
         var speechPitch by remember { mutableFloatStateOf(settingsPrefs.getFloat("speech_pitch", 1.0f).coerceIn(0.7f, 1.4f)) }
@@ -345,14 +349,38 @@ class MainActivity : ComponentActivity() {
             if (result.resultCode == RESULT_OK && result.data != null) {
                 if (continuousScreenRequested) {
                     ScreenCaptureService.onScreenshot = null
-                    ScreenCaptureService.onStopped = {
-                        continuousScreen = false
-                        status = "Live screen sharing stopped."
-                    }
-                    ScreenCaptureService.onFrame = { bytes ->
-                        image = bytes
-                        continuousScreen = true
-                        status = "Live screen sharing is active. Latest frame is attached to your next message."
+                    if (liveAiVideoRequested) {
+                        val session = geminiLiveSession
+                        if (session == null) {
+                            status = "Gemini Live session was not initialized."
+                            continuousScreenRequested = false
+                            liveAiVideoRequested = false
+                            return@rememberLauncherForActivityResult
+                        }
+                        ScreenCaptureService.onStopped = {
+                            runOnUiThread {
+                                session.close()
+                                if (geminiLiveSession === session) geminiLiveSession = null
+                                continuousScreen = false
+                                liveAiVideo = false
+                                status = "Live AI video sharing stopped."
+                            }
+                        }
+                        ScreenCaptureService.onFrame = { bytes ->
+                            if (!session.sendVideoFrame(bytes)) {
+                                runOnUiThread { status = "Waiting for Gemini Live connection…" }
+                            }
+                        }
+                    } else {
+                        ScreenCaptureService.onStopped = {
+                            continuousScreen = false
+                            status = "Live screen sharing stopped."
+                        }
+                        ScreenCaptureService.onFrame = { bytes ->
+                            image = bytes
+                            continuousScreen = true
+                            status = "Live screen sharing is active. Latest frame is attached to your next message."
+                        }
                     }
                 } else {
                     ScreenCaptureService.onFrame = null
@@ -371,17 +399,30 @@ class MainActivity : ComponentActivity() {
                         .putExtra(ScreenCaptureService.EXTRA_DATA, result.data)
                         .putExtra(ScreenCaptureService.EXTRA_CONTINUOUS, continuousScreenRequested)
                     startForegroundService(serviceIntent)
-                    status = if (continuousScreenRequested) "Starting live screen sharing…" else "Capturing the screen you approved…"
+                    status = when {
+                        liveAiVideoRequested -> "Connecting Gemini Live and starting screen video…"
+                        continuousScreenRequested -> "Starting live screen sharing…"
+                        else -> "Capturing the screen you approved…"
+                    }
                 } catch (e: Exception) {
                     ScreenCaptureService.onScreenshot = null
                     ScreenCaptureService.onFrame = null
                     continuousScreen = false
+                    liveAiVideo = false
+                    geminiLiveSession?.close()
+                    geminiLiveSession = null
                     status = e.message ?: "Could not start screen capture."
                 } finally {
                     continuousScreenRequested = false
+                    liveAiVideoRequested = false
                 }
             } else {
                 continuousScreenRequested = false
+                liveAiVideoRequested = false
+                if (geminiLiveSession != null) {
+                    geminiLiveSession?.close()
+                    geminiLiveSession = null
+                }
                 status = "Screen capture cancelled."
             }
         }
@@ -713,8 +754,57 @@ class MainActivity : ComponentActivity() {
                                 screenCapture.launch(manager.createScreenCaptureIntent())
                             }
                         }) { Text(if (continuousScreen) "STOP LIVE SCREEN" else "LIVE SCREEN") }
+                        TextButton(enabled = PluginRegistry.isEnabled(this@MainActivity, "screen_context"), onClick = {
+                            if (liveAiVideo || liveAiVideoRequested) {
+                                startService(Intent(this@MainActivity, ScreenCaptureService::class.java).setAction(ScreenCaptureService.ACTION_STOP))
+                                geminiLiveSession?.close()
+                                geminiLiveSession = null
+                                liveAiVideo = false
+                                liveAiVideoRequested = false
+                                continuousScreenRequested = false
+                                status = "Stopping live AI video…"
+                            } else {
+                                val geminiKey = SecretStore.get(this@MainActivity, AiProvider.GEMINI.secretName)
+                                if (provider != AiProvider.GEMINI) {
+                                    status = "Select Gemini to use its Live video API. Other providers use normal chat requests."
+                                } else if (geminiKey.isBlank()) {
+                                    status = "Add your Gemini API key in Settings before starting Live AI Video."
+                                } else {
+                                    liveAiVideoRequested = true
+                                    continuousScreenRequested = true
+                                    val session = GeminiLiveVideoSession(
+                                        apiKey = geminiKey,
+                                        onReady = {
+                                            runOnUiThread {
+                                                liveAiVideo = true
+                                                continuousScreen = true
+                                                status = "Gemini Live is connected. Screen frames are streaming at about 1 FPS."
+                                            }
+                                        },
+                                        onText = { reply ->
+                                            runOnUiThread {
+                                                messages.add(ChatMessage(reply, false))
+                                                lastReply = reply
+                                                if (speakReplies) tts?.speak(reply, TextToSpeech.QUEUE_FLUSH, Bundle(), "gemini-live-reply")
+                                            }
+                                        },
+                                        onError = { error ->
+                                            runOnUiThread {
+                                                status = "Gemini Live: $error"
+                                                startService(Intent(this@MainActivity, ScreenCaptureService::class.java).setAction(ScreenCaptureService.ACTION_STOP))
+                                                liveAiVideo = false
+                                                liveAiVideoRequested = false
+                                            }
+                                        }
+                                    )
+                                    geminiLiveSession = session
+                                    session.start()
+                                    val manager = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+                                    screenCapture.launch(manager.createScreenCaptureIntent())
+                                }
+                            }
+                        }) { Text(if (liveAiVideo || liveAiVideoRequested) "STOP LIVE AI VIDEO" else "LIVE AI VIDEO") }
                         TextButton(onClick = { modelPicker.launch(arrayOf("application/zip", "application/x-zip-compressed", "application/octet-stream")) }) { Text("IMPORT 3D MODEL") }
-                        TextButton(enabled = !busy, onClick = { offlineWakeModelPicker.launch(arrayOf("application/zip", "application/x-zip-compressed", "application/octet-stream")) }) { Text(if (offlineWakeModelPath.isBlank()) "IMPORT OFFLINE WAKE" else "CHANGE OFFLINE WAKE") }
                         TextButton(onClick = { documentPicker.launch(arrayOf("text/plain", "text/markdown", "text/csv", "application/json", "application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")) }) { Text("FILE") }
                         TextButton(onClick = { exportChat.launch("reverse-assistant-chat.txt") }) { Text("EXPORT CHAT") }
                         TextButton(onClick = { backupExport.launch("reverse-assistant-backup.json") }) { Text("BACKUP") }
@@ -784,6 +874,17 @@ class MainActivity : ComponentActivity() {
                             onClick = {
                             val text = prompt.trim()
                             if (text.isEmpty()) { status = "Write a message first."; return@Button }
+                            if (liveAiVideo) {
+                                val session = geminiLiveSession
+                                if (session == null || !session.sendText(text)) {
+                                    status = "Gemini Live is still connecting. Try sending again in a moment."
+                                    return@Button
+                                }
+                                messages.add(ChatMessage(text, true))
+                                prompt = ""
+                                status = "Message sent to the live Gemini session."
+                                return@Button
+                            }
                             messages.add(ChatMessage(text, true))
                             val assistantMessageIndex = messages.size
                             messages.add(ChatMessage("Connecting to AI…", false))
