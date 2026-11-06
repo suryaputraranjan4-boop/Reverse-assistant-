@@ -577,19 +577,23 @@ class MainActivity : ComponentActivity() {
                             ModelPackageImporter.import(this@MainActivity, uri)
                         }
                         val mesh = withContext(Dispatchers.IO) {
-                            PmxModelNative.loadTriangleVertices(imported.firstPmxPath)
-                        } ?: error("The PMX file was extracted, but Assimp could not create a renderable triangle mesh.")
+                            PmxModelNative.loadTriangleVertices(imported.firstModelPath)
+                        } ?: error("The PMX/PMD file was extracted, but Assimp could not create a renderable triangle mesh.")
                         importedMeshData = mesh
                         importedModelStatus = imported.summary
                         val storageRoot = File(filesDir, "imported-models")
-                        val modelPath = File(imported.firstPmxPath).relativeTo(storageRoot).invariantSeparatorsPath
-                        val packageRoot = File(storageRoot, imported.folderName)
-                        val vmdFile = packageRoot.walkTopDown().firstOrNull { it.isFile && it.extension.equals("vmd", true) }
-                        val motionPath = vmdFile?.relativeTo(storageRoot)?.invariantSeparatorsPath.orEmpty()
-                        startActivity(Intent(this@MainActivity, MmdViewerActivity::class.java)
-                            .putExtra(MmdViewerActivity.EXTRA_MODEL_PATH, modelPath)
-                            .putExtra(MmdViewerActivity.EXTRA_MOTION_PATH, motionPath))
-                        status = "PMX mesh loaded in the companion preview. Opening the full MMD viewer for textures and VMD motion."
+                        if (imported.firstPmxPath != null) {
+                            val modelPath = File(imported.firstPmxPath).relativeTo(storageRoot).invariantSeparatorsPath
+                            val packageRoot = File(storageRoot, imported.folderName)
+                            val vmdFile = packageRoot.walkTopDown().firstOrNull { it.isFile && it.extension.equals("vmd", true) }
+                            val motionPath = vmdFile?.relativeTo(storageRoot)?.invariantSeparatorsPath.orEmpty()
+                            startActivity(Intent(this@MainActivity, MmdViewerActivity::class.java)
+                                .putExtra(MmdViewerActivity.EXTRA_MODEL_PATH, modelPath)
+                                .putExtra(MmdViewerActivity.EXTRA_MOTION_PATH, motionPath))
+                            status = "PMX mesh loaded. Opening the full MMD viewer for textures and VMD motion."
+                        } else {
+                            status = "PMD model imported and rendered in the native mesh preview. PMX is required for full VMD playback."
+                        }
                     } catch (e: Exception) {
                         status = e.message ?: "Could not import the model package."
                     }
