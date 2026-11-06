@@ -304,6 +304,10 @@ class MainActivity : ComponentActivity() {
             if (result.resultCode == RESULT_OK && result.data != null) {
                 if (continuousScreenRequested) {
                     ScreenCaptureService.onScreenshot = null
+                    ScreenCaptureService.onStopped = {
+                        continuousScreen = false
+                        status = "Live screen sharing stopped."
+                    }
                     ScreenCaptureService.onFrame = { bytes ->
                         image = bytes
                         continuousScreen = true
@@ -336,6 +340,7 @@ class MainActivity : ComponentActivity() {
                     continuousScreenRequested = false
                 }
             } else {
+                continuousScreenRequested = false
                 status = "Screen capture cancelled."
             }
         }
@@ -416,6 +421,7 @@ class MainActivity : ComponentActivity() {
                     speechPitch = backup.speechPitch
                     apiKey = SecretStore.get(this@MainActivity, provider.secretName)
                     pendingAction = null
+                    pendingActions = emptyList()
                     lastReply = ""
                     status = "Backup restored. API keys and Android permissions were not changed."
                 } catch (e: Exception) { status = e.message ?: "Could not restore backup." }
@@ -511,11 +517,11 @@ class MainActivity : ComponentActivity() {
                     OutlinedTextField(value = prompt, onValueChange = { prompt = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Message Reverse Assistant") }, minLines = 2)
                     FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         IconButton(onClick = { camera.launch(null) }) { Icon(Icons.Default.CameraAlt, "Camera", tint = Color.White) }
-                        TextButton(onClick = {
+                        TextButton(enabled = PluginRegistry.isEnabled(this@MainActivity, "screen_context"), onClick = {
                             val manager = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
                             screenCapture.launch(manager.createScreenCaptureIntent())
                         }) { Text("SCREEN") }
-                        TextButton(onClick = {
+                        TextButton(enabled = PluginRegistry.isEnabled(this@MainActivity, "screen_context"), onClick = {
                             if (continuousScreen) {
                                 val stop = Intent(this@MainActivity, ScreenCaptureService::class.java).setAction(ScreenCaptureService.ACTION_STOP)
                                 startService(stop)
@@ -697,6 +703,7 @@ class MainActivity : ComponentActivity() {
                             messages.clear()
                             lastReply = ""
                             pendingAction = null
+                            pendingActions = emptyList()
                             status = "Chat history cleared on this device."
                         }) { Text("CLEAR CHAT") }
                         TextButton(onClick = { vaultPicker.launch(null) }) { Text("CONNECT OBSIDIAN") }
