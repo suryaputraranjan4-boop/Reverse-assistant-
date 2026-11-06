@@ -31,6 +31,7 @@ class ScreenCaptureService : Service() {
         const val ACTION_STOP = "com.reverseassistant.STOP_SCREEN_SHARE"
         @Volatile var onScreenshot: ((ByteArray?) -> Unit)? = null
         @Volatile var onFrame: ((ByteArray) -> Unit)? = null
+        @Volatile var onStopped: (() -> Unit)? = null
         private const val CHANNEL_ID = "screen_capture"
         private const val NOTIFICATION_ID = 72
     }
@@ -169,6 +170,10 @@ class ScreenCaptureService : Service() {
         display = null
         reader = null
         projection = null
+        onFrame = null
+        onScreenshot = null
+        onStopped?.invoke()
+        onStopped = null
         super.onDestroy()
     }
 }
