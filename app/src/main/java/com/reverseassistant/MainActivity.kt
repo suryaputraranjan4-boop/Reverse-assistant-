@@ -318,22 +318,13 @@ class MainActivity : ComponentActivity() {
         val documentPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
             if (uri != null) {
                 try {
-                    val input = contentResolver.openInputStream(uri) ?: error("Could not open this document.")
-                    val output = ByteArrayOutputStream()
-                    input.use { stream ->
-                        val buffer = ByteArray(8192)
-                        var total = 0
-                        while (true) {
-                            val count = stream.read(buffer)
-                            if (count <= 0 || total >= 120_000) break
-                            val allowed = minOf(count, 120_000 - total)
-                            output.write(buffer, 0, allowed)
-                            total += allowed
-                        }
+                    attachedDocument = DocumentTextExtractor.extract(this@MainActivity, uri)
+                    attachedDocumentName = DocumentTextExtractor.displayName(uri)
+                    status = if (attachedDocument.isBlank()) {
+                        "No readable text found. Scanned PDFs may need OCR."
+                    } else {
+                        "Document text attached (up to 120,000 characters). It is sent only when you press Send."
                     }
-                    attachedDocument = output.toString("UTF-8")
-                    attachedDocumentName = uri.lastPathSegment?.substringAfterLast('/')?.take(80) ?: "Attached text file"
-                    status = "Document attached (up to 120 KB). It will be sent to the selected AI provider with your next message."
                 } catch (e: Exception) { status = e.message ?: "Could not read document." }
             }
         }
@@ -412,7 +403,7 @@ class MainActivity : ComponentActivity() {
                             val manager = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
                             screenCapture.launch(manager.createScreenCaptureIntent())
                         }) { Text("SCREEN") }
-                        TextButton(onClick = { documentPicker.launch(arrayOf("text/plain", "text/markdown", "text/csv", "application/json")) }) { Text("FILE") }
+                        TextButton(onClick = { documentPicker.launch(arrayOf("text/plain", "text/markdown", "text/csv", "application/json", "application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")) }) { Text("FILE") }
                         TextButton(onClick = { exportChat.launch("reverse-assistant-chat.txt") }) { Text("EXPORT") }
                         TextButton(onClick = {
                             if (liveListening) {
