@@ -16,7 +16,9 @@
 - API key encryption and Obsidian note append are present.
 - Camera photo, voice transcription and TTS are wired into the UI.
 - Accessibility exposes screen text and a validated gesture allow-list. When a phone-control request is detected, the AI can propose one action; the user must review and confirm it before dispatch.
-- There is no APK build result or device test result committed yet.
+- GitHub Actions successfully completed a debug APK build and uploaded the artifact (workflow run 42193647302). This verifies compilation and packaging in CI, not runtime behavior on a physical phone.
+- Screen text is now collected and sent to the selected AI provider only when the user message is detected as an explicit phone-control request. Phone actions remain allow-listed and require a separate confirmation tap.
+- Physical-device testing, provider-by-provider live API tests, persistent chat history, robust app launching/navigation, and the 3D avatar renderer remain unfinished.
 
 ## Safety and consent
 
