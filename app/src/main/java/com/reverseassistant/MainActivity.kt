@@ -371,9 +371,9 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                         ScreenCaptureService.onFrame = { bytes ->
-                            if (!session.sendVideoFrame(bytes)) {
-                                runOnUiThread { status = "Waiting for Gemini Live connection…" }
-                            }
+                            // Frames are intentionally dropped while setup is pending or the
+                            // WebSocket is backlogged; the next fresh frame can still be sent.
+                            session.sendVideoFrame(bytes)
                         }
                     } else {
                         ScreenCaptureService.onStopped = {

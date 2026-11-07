@@ -18,7 +18,7 @@ Android-first personal AI companion built with Kotlin, Jetpack Compose, Material
 - PMX/MMD ZIP archive import into app-private storage with bounded extraction and path traversal checks. Assimp's MMD importer now loads static triangle meshes into the companion preview with per-material diffuse colors; skeletal posing, VMD animation, physics, and texture maps remain incomplete.
 - External MCP Streamable HTTP server manager: save trusted HTTPS endpoints, encrypt bearer tokens, discover tools, and call a selected tool only after a direct Run action.
 - Optional on-device GGUF inference through the llama.cpp Android native runtime (arm64-v8a); the user imports model weights locally.
-- Gemini Live screen-video session: after Android MediaProjection consent, sends downscaled JPEG screen frames to Gemini Live at approximately 1 FPS and routes user text prompts through the same session.
+- Gemini Live screen-video session: after Android MediaProjection consent, sends downscaled JPEG screen frames to Gemini Live at approximately 1 FPS and routes user text prompts through the same session. Its outbound WebSocket queue is bounded; oversized frames and frames arriving during network backlog are dropped so stale screen content does not accumulate.
 
 ## Feature boundaries — read before testing
 
