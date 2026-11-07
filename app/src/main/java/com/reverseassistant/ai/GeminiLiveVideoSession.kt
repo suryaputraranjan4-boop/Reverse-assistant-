@@ -100,10 +100,27 @@ class GeminiLiveVideoSession(
 
     fun sendVideoFrame(jpeg: ByteArray): Boolean {
         if (!setupComplete || closed || jpeg.isEmpty()) return false
+        val currentSocket = socket ?: return false
+        // Never let a slow connection accumulate stale screen frames in OkHttp's send queue.
+        if (!canQueueFrame(currentSocket.queueSize(), jpeg.size)) return false
         val message = JSONObject().put("realtimeInput", JSONObject().put("video",
             JSONObject().put("mimeType", "image/jpeg")
                 .put("data", Base64.encodeToString(jpeg, Base64.NO_WRAP))))
-        return socket?.send(message.toString()) == true
+        return currentSocket.send(message.toString())
+    }
+
+    companion object {
+        internal const val MAX_PENDING_VIDEO_BYTES = 2L * 1024L * 1024L
+        internal const val MAX_VIDEO_FRAME_BYTES = 1024 * 1024
+
+        /** Estimate the base64 JSON payload before enqueueing it on the WebSocket. */
+        internal fun canQueueFrame(queuedBytes: Long, jpegBytes: Int): Boolean {
+            if (queuedBytes < 0L || jpegBytes <= 0 || jpegBytes > MAX_VIDEO_FRAME_BYTES) return false
+            val encodedBytes = ((jpegBytes.toLong() + 2L) / 3L) * 4L
+            val estimatedMessageBytes = encodedBytes + 256L
+            return queuedBytes <= MAX_PENDING_VIDEO_BYTES &&
+                estimatedMessageBytes <= MAX_PENDING_VIDEO_BYTES - queuedBytes
+        }
     }
 
     fun sendText(text: String): Boolean {
