@@ -28,6 +28,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.*
@@ -278,6 +281,7 @@ class MainActivity : ComponentActivity() {
         var customEndpoint by remember { mutableStateOf(settingsPrefs.getString("custom_provider_endpoint", "") ?: "") }
         var offlineModelPath by remember { mutableStateOf(settingsPrefs.getString("offline_model_path", "") ?: "") }
         var showSettings by remember { mutableStateOf(false) }
+        val drawerState = rememberDrawerState(DrawerValue.Closed)
         var showPlugins by remember { mutableStateOf(false) }
         var showMcpServers by remember { mutableStateOf(false) }
         var pluginRevision by remember { mutableIntStateOf(0) }
@@ -577,19 +581,23 @@ class MainActivity : ComponentActivity() {
                             ModelPackageImporter.import(this@MainActivity, uri)
                         }
                         val mesh = withContext(Dispatchers.IO) {
-                            PmxModelNative.loadTriangleVertices(imported.firstPmxPath)
-                        } ?: error("The PMX file was extracted, but Assimp could not create a renderable triangle mesh.")
+                            PmxModelNative.loadTriangleVertices(imported.firstModelPath)
+                        } ?: error("The PMX/PMD file was extracted, but Assimp could not create a renderable triangle mesh.")
                         importedMeshData = mesh
                         importedModelStatus = imported.summary
                         val storageRoot = File(filesDir, "imported-models")
-                        val modelPath = File(imported.firstPmxPath).relativeTo(storageRoot).invariantSeparatorsPath
-                        val packageRoot = File(storageRoot, imported.folderName)
-                        val vmdFile = packageRoot.walkTopDown().firstOrNull { it.isFile && it.extension.equals("vmd", true) }
-                        val motionPath = vmdFile?.relativeTo(storageRoot)?.invariantSeparatorsPath.orEmpty()
-                        startActivity(Intent(this@MainActivity, MmdViewerActivity::class.java)
-                            .putExtra(MmdViewerActivity.EXTRA_MODEL_PATH, modelPath)
-                            .putExtra(MmdViewerActivity.EXTRA_MOTION_PATH, motionPath))
-                        status = "PMX mesh loaded in the companion preview. Opening the full MMD viewer for textures and VMD motion."
+                        if (imported.firstPmxPath != null) {
+                            val modelPath = File(imported.firstPmxPath).relativeTo(storageRoot).invariantSeparatorsPath
+                            val packageRoot = File(storageRoot, imported.folderName)
+                            val vmdFile = packageRoot.walkTopDown().firstOrNull { it.isFile && it.extension.equals("vmd", true) }
+                            val motionPath = vmdFile?.relativeTo(storageRoot)?.invariantSeparatorsPath.orEmpty()
+                            startActivity(Intent(this@MainActivity, MmdViewerActivity::class.java)
+                                .putExtra(MmdViewerActivity.EXTRA_MODEL_PATH, modelPath)
+                                .putExtra(MmdViewerActivity.EXTRA_MOTION_PATH, motionPath))
+                            status = "PMX mesh loaded. Opening the full MMD viewer for textures and VMD motion."
+                        } else {
+                            status = "PMD model imported and rendered in the native mesh preview. PMX is required for full VMD playback."
+                        }
                     } catch (e: Exception) {
                         status = e.message ?: "Could not import the model package."
                     }
@@ -621,25 +629,56 @@ class MainActivity : ComponentActivity() {
             surfaceVariant = Color(0xFF1B2638), onSurfaceVariant = Color(0xFFA9B5C9),
             outline = Color(0xFF344156)
         )) {
+            ModalNavigationDrawer(
+                drawerState = drawerState,
+                scrimColor = Color(0xCC050711),
+                drawerContent = {
+                    ModalDrawerSheet(drawerContainerColor = Color(0xFF111827), drawerContentColor = Color(0xFFF4F5FB)) {
+                        Text("REVERSE ASSISTANT", Modifier.padding(start = 22.dp, top = 28.dp, bottom = 18.dp),
+                            color = Color(0xFFC5B5FF), style = MaterialTheme.typography.titleMedium)
+                        NavigationDrawerItem(label = { Text("Home") }, selected = true, onClick = { scope.launch { drawerState.close() } })
+                        NavigationDrawerItem(label = { Text("AI Providers & API keys") }, selected = false,
+                            onClick = { showSettings = true; scope.launch { drawerState.close() } })
+                        NavigationDrawerItem(label = { Text("MCP Servers & Plugins") }, selected = false,
+                            onClick = { showPlugins = true; scope.launch { drawerState.close() } })
+                        NavigationDrawerItem(label = { Text(if (wakeWordActive) "Stop Wake Word" else "Wake Word") }, selected = false,
+                            onClick = {
+                                if (wakeWordActive || WakeWordService.active) {
+                                    startService(Intent(this@MainActivity, WakeWordService::class.java).setAction(WakeWordService.ACTION_STOP))
+                                    wakeWordActive = false
+                                    status = "Wake phrase listener stopped."
+                                } else wakeWordPermission.launch(Manifest.permission.RECORD_AUDIO)
+                                scope.launch { drawerState.close() }
+                            })
+                        NavigationDrawerItem(label = { Text("Share screen") }, selected = false,
+                            onClick = {
+                                continuousScreenRequested = true
+                                val manager = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+                                screenCapture.launch(manager.createScreenCaptureIntent())
+                                scope.launch { drawerState.close() }
+                            })
+                        NavigationDrawerItem(label = { Text("Offline LLM") }, selected = false,
+                            onClick = { offlineModelPicker.launch(arrayOf("*/*")); scope.launch { drawerState.close() } })
+                        NavigationDrawerItem(label = { Text("Import PMD / PMX model") }, selected = false,
+                            onClick = { modelPicker.launch(arrayOf("application/zip", "application/x-zip-compressed", "application/octet-stream")); scope.launch { drawerState.close() } })
+                        NavigationDrawerItem(label = { Text("Accessibility / Touch controls") }, selected = false,
+                            onClick = { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)); scope.launch { drawerState.close() } })
+                    }
+                }
+            ) {
             Scaffold(
                 topBar = {
                     TopAppBar(
-                        title = {
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(11.dp)) {
-                                Surface(shape = RoundedCornerShape(14.dp), color = Color(0xFF292344)) {
-                                    Box(Modifier.size(40.dp), contentAlignment = Alignment.Center) {
-                                        Text("R", color = Color(0xFFC8B8FF), style = MaterialTheme.typography.titleLarge)
-                                    }
-                                }
-                                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                    Text("Reverse Assistant", style = MaterialTheme.typography.titleMedium)
-                                    Text("PERSONAL AI COMPANION", color = Color(0xFF9AA8BF), style = MaterialTheme.typography.labelSmall)
-                                }
+                        navigationIcon = {
+                            IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                                Icon(Icons.Default.Menu, contentDescription = "Open side menu", tint = Color(0xFFC5B5FF))
                             }
                         },
-                        actions = {
-                            TextButton(onClick = { showPlugins = true }) { Text("PLUGINS", style = MaterialTheme.typography.labelMedium) }
-                            TextButton(onClick = { showSettings = true }) { Text("SETTINGS", style = MaterialTheme.typography.labelMedium) }
+                        title = {
+                            Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                                Text("Reverse Assistant", style = MaterialTheme.typography.titleMedium)
+                                Text("PERSONAL AI COMPANION", color = Color(0xFF9AA8BF), style = MaterialTheme.typography.labelSmall)
+                            }
                         },
                         colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0B1020), titleContentColor = Color(0xFFF4F5FB))
                     )
@@ -647,58 +686,37 @@ class MainActivity : ComponentActivity() {
                 containerColor = Color(0xFF080B14)
             ) { padding ->
                 Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(), color = Color(0xFF111827),
-                        shape = RoundedCornerShape(20.dp),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF253149))
-                    ) {
-                        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Box {
-                                OutlinedButton(onClick = { showProviderMenu = true }, shape = RoundedCornerShape(14.dp),
-                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFC9BCFF))
-                                ) { Text(provider.label + " ▾") }
-                                DropdownMenu(expanded = showProviderMenu, onDismissRequest = { showProviderMenu = false }) {
-                                    AiProvider.values().forEach { item ->
-                                        DropdownMenuItem(text = { Text(item.label) }, onClick = {
-                                            provider = item; model = item.defaultModel
-                                            apiKey = SecretStore.get(this@MainActivity, item.secretName)
-                                            showProviderMenu = false
-                                        })
-                                    }
-                                }
-                            }
-                            Spacer(Modifier.width(10.dp))
-                            OutlinedTextField(value = model, onValueChange = { model = it },
-                                label = { Text("Model ID") }, singleLine = true,
-                                modifier = Modifier.weight(1f), shape = RoundedCornerShape(14.dp))
+                    DropdownMenu(expanded = showProviderMenu, onDismissRequest = { showProviderMenu = false }) {
+                        AiProvider.values().forEach { item ->
+                            DropdownMenuItem(text = { Text(item.label) }, onClick = {
+                                provider = item
+                                model = item.defaultModel
+                                apiKey = SecretStore.get(this@MainActivity, item.secretName)
+                                showProviderMenu = false
+                            })
                         }
                     }
                     Surface(
-                        modifier = Modifier.fillMaxWidth(), color = Color(0xFF121A2B),
-                        shape = RoundedCornerShape(24.dp),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF283650))
+                        modifier = Modifier.fillMaxWidth().weight(0.78f), color = Color(0xFF101426),
+                        shape = RoundedCornerShape(28.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF30284C))
                     ) {
-                        Row(Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                                Text("YOUR AI COMPANION", color = Color(0xFFC5B5FF), style = MaterialTheme.typography.labelMedium)
-                                Text("Always ready to help.", color = Color(0xFFF4F5FB), style = MaterialTheme.typography.titleMedium)
-                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    Box(Modifier.size(7.dp).background(if (busy) Color(0xFFFBBF24) else Color(0xFF67E8D5), RoundedCornerShape(50)))
-                                    Text(if (busy) "Working…" else "Ready · ${provider.label}", color = Color(0xFFA9B5C9), style = MaterialTheme.typography.labelSmall)
-                                }
-                                if (importedModelStatus.isNotBlank()) Text("Imported assets: $importedModelStatus", color = Color(0xFF67E8D5), style = MaterialTheme.typography.bodySmall)
-                            }
+                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             AndroidView(
                                 factory = { context -> Avatar3DView(context).also { avatarView = it } },
                                 update = { view ->
                                     view.setSpeaking(avatarSpeaking)
                                     view.setImportedMesh(importedMeshData)
                                 },
-                                modifier = Modifier.width(116.dp).height(132.dp).background(Color(0xFF0B1020), RoundedCornerShape(20.dp))
+                                modifier = Modifier.fillMaxSize().padding(8.dp)
                             )
+                            Column(Modifier.align(Alignment.TopCenter).padding(top = 14.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text(if (avatarSpeaking) "SPEAKING" else if (busy) "THINKING" else "READY",
+                                    color = Color(0xFFC5B5FF), style = MaterialTheme.typography.labelSmall)
+                                Text(if (importedModelStatus.isNotBlank()) importedModelStatus else "AI COMPANION",
+                                    color = Color(0xFF9EACC1), style = MaterialTheme.typography.labelSmall)
+                            }
                         }
                     }
                     Surface(
@@ -743,9 +761,22 @@ class MainActivity : ComponentActivity() {
                         Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             if (image != null) Text("Photo / screen attached · sent when you press Send", color = Color(0xFF67E8D5), style = MaterialTheme.typography.labelSmall)
                             if (attachedDocument.isNotBlank()) Text("$attachedDocumentName attached · sent when you press Send", color = Color(0xFF67E8D5), style = MaterialTheme.typography.labelSmall)
-                            OutlinedTextField(value = prompt, onValueChange = { prompt = it },
-                                modifier = Modifier.fillMaxWidth(), placeholder = { Text("Message your assistant…") },
-                                minLines = 2, maxLines = 5, shape = RoundedCornerShape(16.dp))
+                            Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                IconButton(onClick = { camera.launch(null) }) {
+                                    Icon(Icons.Default.PhotoCamera, contentDescription = "Take a photo", tint = Color(0xFF67E8D5))
+                                }
+                                IconButton(enabled = PluginRegistry.isEnabled(this@MainActivity, "screen_context"),
+                                    onClick = {
+                                        continuousScreenRequested = true
+                                        val manager = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+                                        screenCapture.launch(manager.createScreenCaptureIntent())
+                                    }) {
+                                    Icon(Icons.Default.Videocam, contentDescription = "Share live screen", tint = Color(0xFFC5B5FF))
+                                }
+                                OutlinedTextField(value = prompt, onValueChange = { prompt = it },
+                                    modifier = Modifier.weight(1f), placeholder = { Text("Message your assistant…") },
+                                    minLines = 1, maxLines = 4, shape = RoundedCornerShape(16.dp))
+                            }
                         }
                     }
                     Surface(
@@ -1006,7 +1037,7 @@ class MainActivity : ComponentActivity() {
                                             status = "Enable Reverse Assistant touch controls in Android Accessibility settings first."
                                         } else {
                                             val ok = action.execute(service)
-                                            status = if (ok) "Step confirmed and dispatched." else "Android could not dispatch that action."
+                                            status = if (ok) "Android accepted the gesture request. Completion is not verified yet; I will not claim it is done." else "Android did not accept the gesture request. The task was not completed."
                                             if (ok) {
                                                 pendingAction = pendingActions.firstOrNull()
                                                 pendingActions = pendingActions.drop(1)
@@ -1039,6 +1070,7 @@ class MainActivity : ComponentActivity() {
                         TextButton(onClick = { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }) { Text("ENABLE TOUCH CONTROLS") }
                     }
                 }
+            }
             }
         }
 
